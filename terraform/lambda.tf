@@ -47,6 +47,16 @@ resource "aws_lambda_function_url" "discord" {
   authorization_type = "NONE" # Discord は SigV4 不可。認証は Ed25519 署名検証で行う
 }
 
+# Function URL の公開呼び出し許可。コンソール作成時は自動付与されるが
+# Terraform では明示が必要 (無いと全リクエストが 403 になる)。
+resource "aws_lambda_permission" "function_url" {
+  statement_id           = "AllowPublicFunctionUrl"
+  action                 = "lambda:InvokeFunctionUrl"
+  function_name          = aws_lambda_function.discord.function_name
+  principal              = "*"
+  function_url_auth_type = "NONE"
+}
+
 # ---------------------------------------------------------------------------
 # 通知 B 系統: インスタンスの生死に関係なく届く AWS 側イベント。
 # ---------------------------------------------------------------------------

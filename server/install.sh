@@ -74,9 +74,22 @@ else
 fi
 
 chown -R palworld:palworld "$PAL_HOME"
+
 # +app_update はキャッシュありなら差分パッチのみで数十秒。
-sudo -u palworld "$STEAMCMD" +force_install_dir "$PAL_DIR" +login anonymous \
-  +app_update $APPID +quit >/dev/null
+# steamcmd は一時的な CDN 不調で落ちることがあるためリトライし、
+# それでも駄目なら通知して明示的に失敗させる (無言で死なせない)。
+run_steamcmd() {
+  sudo -u palworld "$STEAMCMD" +force_install_dir "$PAL_DIR" +login anonymous \
+    +app_update $APPID +quit >/dev/null
+}
+if ! run_steamcmd; then
+  log "steamcmd failed; retrying in 10s"
+  sleep 10
+  if ! run_steamcmd; then
+    notify "🚨 ゲーム本体の取得に失敗しました" "steamcmd が 2 回失敗しました。Steam 側の一時障害の可能性があります。\n/pal stop のあと、時間をおいて /pal start でやり直してください。" red
+    exit 1
+  fi
+fi
 
 # PalServer.sh が要求する steamclient.so (64bit) を配置。
 # steamcmd (deb 版) のブートストラップ先は ~/Steam。

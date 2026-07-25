@@ -139,14 +139,20 @@ async function runWorker({ action, token }) {
     content = `⚠️ エラーが発生しました: ${e.name}: ${e.message}`;
   }
 
-  await fetch(
-    `https://discord.com/api/v10/webhooks/${DISCORD_APP_ID}/${token}/messages/@original`,
-    {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content }),
-    },
-  );
+  // PATCH の失敗でハンドラを異常終了させない。非同期 invoke はエラー時に
+  // Lambda が自動リトライするため、throw すると restart 等の実処理が二重実行される。
+  try {
+    await fetch(
+      `https://discord.com/api/v10/webhooks/${DISCORD_APP_ID}/${token}/messages/@original`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content }),
+      },
+    );
+  } catch (e) {
+    console.error("failed to edit deferred response", e);
+  }
 }
 
 async function getAsg() {

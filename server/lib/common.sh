@@ -44,7 +44,8 @@ imds_get() {
 }
 
 instance_id() {
-  if [ ! -f "$STATE_DIR/instance-id" ]; then
+  # -s: 空ファイル (取得失敗の残骸) はキャッシュとみなさず再取得する
+  if [ ! -s "$STATE_DIR/instance-id" ]; then
     imds_get "meta-data/instance-id" > "$STATE_DIR/instance-id"
   fi
   cat "$STATE_DIR/instance-id"

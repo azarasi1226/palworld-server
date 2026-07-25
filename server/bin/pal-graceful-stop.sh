@@ -21,6 +21,11 @@ fi
 START_EPOCH=$(date +%s)
 log "graceful stop start (reason=$REASON)"
 
+# 定期タイマーを先に止める。放置すると停止後に status タイマーが
+# ロックを再作成し、次のインスタンスが陳腐化判定の 90 秒を無駄に待つ。
+# (pal-idle / pal-guardian は本スクリプトの呼び出し元になりうるため止めない)
+systemctl stop pal-backup.timer pal-status.timer 2>/dev/null || true
+
 case "$REASON" in
   spot)      notify "⚠️ スポット中断の警告を受信しました" "約 2 分後に強制終了されます。セーブして退避します。切断される可能性があります。" yellow ;;
   idle)      notify "💤 無人のため自動停止します" "${PAL_IDLE_MINUTES} 分間接続がありませんでした。セーブして停止します。" blue ;;
@@ -44,17 +49,18 @@ systemctl stop palworld.service 2>/dev/null || true
 
 # --- ログ退避 ---------------------------------------------------------------
 TS=$(date -u +%Y%m%dT%H%M%SZ)
-journalctl -u palworld -u pal-guardian --no-pager --since "-6 hours" \
+journalctl -u palworld -u pal-guardian --no-pager --since -6h \
   > "$WORK_DIR/server-$TS.log" 2>/dev/null || true
 $AWS s3 cp "$WORK_DIR/server-$TS.log" "$S3/logs/server-$TS.log" --no-progress >/dev/null 2>&1 || true
 
-# --- status.json を停止状態へ ----------------------------------------------
+# --- 停止確定 ---------------------------------------------------------------
+# フラグを先に立ててから status 発行・ロック解放を行う。
+# 逆順だと並走中の status タイマーが解放後にロックを再作成しうる。
+touch "$STATE_DIR/stopped"
 /opt/palworld/bin/pal-status.sh stopped 2>/dev/null || true
 
 # --- ロック解放 (必ずセーブのアップロード後) --------------------------------
 lock_release
-
-touch "$STATE_DIR/stopped"
 
 # --- ASG への後始末 ---------------------------------------------------------
 IID=$(instance_id)

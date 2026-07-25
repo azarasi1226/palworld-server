@@ -34,20 +34,27 @@ while true; do
 
     if [ "$STATE" = "Terminating:Wait" ]; then
       if [ -f "$STATE_DIR/stopped" ]; then
-        # 自発停止 (idle/manual) 済み。セーブは完了しているのでフック解放のみ。
+        # 停止処理は完了済み。残タスクはフック解放のみ。
+        # 失敗したら exit せず次のループで再試行する (exit すると誰も解放できず
+        # ASG がタイムアウトの 300 秒を待ってしまう)。
         log "already stopped; completing lifecycle hook"
         ASG_NAME=$($AWS autoscaling describe-auto-scaling-instances --instance-ids "$IID" \
           --query "AutoScalingInstances[0].AutoScalingGroupName" --output text 2>/dev/null || true)
-        $AWS autoscaling complete-lifecycle-action \
+        if [ -n "$ASG_NAME" ] && $AWS autoscaling complete-lifecycle-action \
           --auto-scaling-group-name "$ASG_NAME" \
           --lifecycle-hook-name "$PAL_PROJECT-save-before-terminate" \
           --instance-id "$IID" \
-          --lifecycle-action-result CONTINUE 2>/dev/null || true
-        exit 0
+          --lifecycle-action-result CONTINUE 2>/dev/null; then
+          log "lifecycle hook completed; guardian exiting"
+          exit 0
+        fi
+        log "WARN: complete-lifecycle-action failed; will retry"
+      else
+        # graceful-stop がフック解放まで行う。失敗していても stopped フラグが
+        # 立つので、次のループで上の解放リトライに合流する。
+        log "SIGNAL: ASG lifecycle Terminating:Wait"
+        /opt/palworld/bin/pal-graceful-stop.sh lifecycle || true
       fi
-      log "SIGNAL: ASG lifecycle Terminating:Wait"
-      /opt/palworld/bin/pal-graceful-stop.sh lifecycle
-      exit 0
     fi
   fi
 
