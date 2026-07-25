@@ -59,11 +59,14 @@ public_ip() {
 # ---------------------------------------------------------------------------
 
 rcon() {
-  local pass
-  pass=$($AWS ssm get-parameter --name "/$PAL_PROJECT/server/admin_password" \
-    --with-decryption --query Parameter.Value --output text)
+  # 30 秒ごとの status 発行などで毎回 SSM を叩かないよう、tmpfs にキャッシュする。
+  local cache="$STATE_DIR/rcon-pass"
+  if [ ! -s "$cache" ]; then
+    (umask 077; $AWS ssm get-parameter --name "/$PAL_PROJECT/server/admin_password" \
+      --with-decryption --query Parameter.Value --output text > "$cache")
+  fi
   python3 /opt/palworld/bin/rcon.py --host 127.0.0.1 --port "$RCON_PORT" \
-    --password "$pass" --timeout 10 "$@"
+    --password "$(cat "$cache")" --timeout 10 "$@"
 }
 
 # Palworld の Broadcast はスペースを含むと以降が切れるためアンダースコアに置換する。

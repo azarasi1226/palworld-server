@@ -21,6 +21,7 @@ python3 - "$TITLE" "$BODY" "$COLOR" "$WEBHOOK" <<'PYEOF'
 import json, sys, urllib.request
 
 title, body, color, webhook = sys.argv[1], sys.argv[2], int(sys.argv[3]), sys.argv[4]
+body = body.replace("\\n", "\n")  # 呼び出し側は bash の "...\n..." (リテラル) で渡してくる
 payload = {"embeds": [{"title": title, "description": body, "color": color}]}
 req = urllib.request.Request(
     webhook,

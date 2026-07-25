@@ -7,6 +7,10 @@ source /opt/palworld/lib/common.sh
 
 STATE="${1:-running}"
 
+# 停止シーケンス完了後もタイマーは動き続けるため、"running" で
+# 停止状態の status.json を上書きしてしまわないようにする。
+[ -f "$STATE_DIR/stopped" ] && STATE="stopped"
+
 PLAYERS_JSON="[]"
 COUNT=0
 if [ "$STATE" = "running" ]; then

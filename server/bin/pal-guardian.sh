@@ -14,18 +14,20 @@ tick=0
 log "guardian started (instance=$IID)"
 
 while true; do
-  # --- 1. Spot 中断通知 (404 = 無し) ---------------------------------------
-  if imds_get "meta-data/spot/instance-action" >/dev/null; then
-    log "SIGNAL: spot interruption notice"
-    /opt/palworld/bin/pal-graceful-stop.sh spot
-    exit 0
-  fi
+  # 停止完了後は Terminating:Wait のフック解放だけが残タスク。
+  # exit せずループを続けるのは、その解放役が guardian 自身だから。
+  if [ ! -f "$STATE_DIR/stopped" ]; then
+    # --- 1. Spot 中断通知 (404 = 無し) -------------------------------------
+    if imds_get "meta-data/spot/instance-action" >/dev/null; then
+      log "SIGNAL: spot interruption notice"
+      /opt/palworld/bin/pal-graceful-stop.sh spot || true
+    fi
 
-  # --- 2. リバランス推奨 ---------------------------------------------------
-  if imds_get "meta-data/events/recommendations/rebalance" >/dev/null; then
-    log "SIGNAL: rebalance recommendation"
-    /opt/palworld/bin/pal-graceful-stop.sh rebalance
-    exit 0
+    # --- 2. リバランス推奨 -------------------------------------------------
+    if imds_get "meta-data/events/recommendations/rebalance" >/dev/null; then
+      log "SIGNAL: rebalance recommendation"
+      /opt/palworld/bin/pal-graceful-stop.sh rebalance || true
+    fi
   fi
 
   # --- 3. ASG ライフサイクル (API なので間引く) ----------------------------

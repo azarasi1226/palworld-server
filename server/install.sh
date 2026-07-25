@@ -29,7 +29,9 @@ apt-get update -qq
 # steamcmd のライセンス同意を非対話で通す。
 echo steam steam/question select "I AGREE" | debconf-set-selections
 echo steam steam/license note '' | debconf-set-selections
-apt-get install -y -qq steamcmd zstd curl jq >/dev/null
+# steamcmd は Ubuntu では i386 パッケージのみ。
+apt-get install -y -qq zstd curl jq >/dev/null
+apt-get install -y -qq steamcmd:i386 >/dev/null || apt-get install -y -qq steamcmd >/dev/null
 
 STEAMCMD=/usr/games/steamcmd
 
@@ -76,10 +78,22 @@ chown -R palworld:palworld "$PAL_HOME"
 sudo -u palworld "$STEAMCMD" +force_install_dir "$PAL_DIR" +login anonymous \
   +app_update $APPID +quit >/dev/null
 
-# PalServer.sh が要求する steamclient.so を配置。
+# PalServer.sh が要求する steamclient.so (64bit) を配置。
+# steamcmd (deb 版) のブートストラップ先は ~/Steam。
 sudo -u palworld mkdir -p /home/palworld/.steam/sdk64
-sudo -u palworld cp "$PAL_DIR/linux64/steamclient.so" /home/palworld/.steam/sdk64/ 2>/dev/null || \
-  sudo -u palworld cp /usr/games/../lib/games/steam/steamclient.so /home/palworld/.steam/sdk64/ 2>/dev/null || true
+for so in /home/palworld/Steam/linux64/steamclient.so \
+          /home/palworld/.local/share/Steam/steamcmd/linux64/steamclient.so; do
+  if [ -f "$so" ]; then
+    sudo -u palworld cp "$so" /home/palworld/.steam/sdk64/steamclient.so
+    break
+  fi
+done
+if [ ! -f /home/palworld/.steam/sdk64/steamclient.so ]; then
+  # 最終手段: Steamworks SDK Redist (appid 1007) から取得する。
+  sudo -u palworld "$STEAMCMD" +login anonymous +app_update 1007 +quit >/dev/null || true
+  sudo -u palworld cp "/home/palworld/Steam/steamapps/common/Steamworks SDK Redist/linux64/steamclient.so" \
+    /home/palworld/.steam/sdk64/steamclient.so 2>/dev/null || true
+fi
 
 # buildid が変わっていたらキャッシュを更新 (アップロードは起動をブロックしないよう裏で)。
 LOCAL_BUILD=$(grep -Po '"buildid"\s+"\K[0-9]+' "$PAL_DIR/steamapps/appmanifest_$APPID.acf" 2>/dev/null || echo 0)
@@ -119,7 +133,7 @@ export PAL_SERVER_NAME PAL_SERVER_DESC PAL_MAX_PLAYERS PAL_GAME_PORT PAL_EXTRA_S
 export ADMIN_PASS SERVER_PASS
 
 # DefaultPalWorldSettings.ini (全キー入りの雛形) を正として上書き項目を注入する。
-python3 - "$PAL_DIR/DefaultPalWorldSettings.ini" "$CONF_DIR/PalWorldSettings.ini" <<PYEOF
+python3 - "$PAL_DIR/DefaultPalWorldSettings.ini" "$CONF_DIR/PalWorldSettings.ini" <<'PYEOF'
 import re, sys, os
 
 src, dst = sys.argv[1], sys.argv[2]

@@ -1,0 +1,28 @@
+# --- Terraform -------------------------------------------------------------
+# プロバイダーバイナリ・モジュールキャッシュ (数百 MB。init で再生成できる)
+terraform/.terraform/
+
+# state には SSM SecureString の値など秘匿情報が平文で入る。絶対にコミットしない
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+
+# terraform.tfvars には Discord webhook URL 等の秘密が入る (example のみ追跡)
+*.tfvars
+!*.tfvars.example
+
+# terraform plan の保存ファイル・クラッシュログ
+*.tfplan
+crash.log
+crash.*.log
+
+# --- Python ----------------------------------------------------------------
+__pycache__/
+*.pyc
+
+# --- Node ------------------------------------------------------------------
+node_modules/
+
+# --- misc ------------------------------------------------------------------
+*.zip
+.DS_Store
