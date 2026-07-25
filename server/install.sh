@@ -109,14 +109,24 @@ if [ ! -f /home/palworld/.steam/sdk64/steamclient.so ]; then
 fi
 
 # buildid が変わっていたらキャッシュを更新 (アップロードは起動をブロックしないよう裏で)。
+# --exclude ./Pal/Saved が重要: このディレクトリはゲームが書き込み続けるため、
+# 含めると並行する tar が「file changed as we read it」で死ぬ (レース)。
+# セーブは S3 の saves/ が正、設定は毎起動生成なので、キャッシュに入れる理由もない。
 LOCAL_BUILD=$(grep -Po '"buildid"\s+"\K[0-9]+' "$PAL_DIR/steamapps/appmanifest_$APPID.acf" 2>/dev/null || echo 0)
 REMOTE_BUILD=$($AWS s3 cp "$S3/gamecache/buildid.txt" - 2>/dev/null || echo 0)
 if [ "$LOCAL_BUILD" != "$REMOTE_BUILD" ] && [ "$LOCAL_BUILD" != "0" ]; then
   log "game updated (build $REMOTE_BUILD -> $LOCAL_BUILD); refreshing cache in background"
   (
-    tar -C "$PAL_DIR" -cf - . | zstd -3 -T0 -q > "$WORK_DIR/gamecache.tar.zst"
-    $AWS s3 cp "$WORK_DIR/gamecache.tar.zst" "$S3/gamecache/palserver.tar.zst" --no-progress >/dev/null
-    echo "$LOCAL_BUILD" | $AWS s3 cp - "$S3/gamecache/buildid.txt" >/dev/null
+    if tar -C "$PAL_DIR" --exclude ./Pal/Saved -cf - . | zstd -3 -T0 -q > "$WORK_DIR/gamecache.tar.zst"; then
+      if $AWS s3 cp "$WORK_DIR/gamecache.tar.zst" "$S3/gamecache/palserver.tar.zst" --no-progress >/dev/null \
+        && echo "$LOCAL_BUILD" | $AWS s3 cp - "$S3/gamecache/buildid.txt" >/dev/null; then
+        log "game cache uploaded (build $LOCAL_BUILD, $(stat -c %s "$WORK_DIR/gamecache.tar.zst" 2>/dev/null || echo '?')B)"
+      else
+        log "WARN: game cache upload failed (next boot will do a full install)"
+      fi
+    else
+      log "WARN: game cache tar failed (next boot will do a full install)"
+    fi
     rm -f "$WORK_DIR/gamecache.tar.zst"
   ) &
 fi
@@ -143,7 +153,8 @@ mkdir -p "$CONF_DIR"
 
 # python ブロックが environ 経由で読むため export する。
 export PAL_SERVER_NAME PAL_SERVER_DESC PAL_MAX_PLAYERS PAL_GAME_PORT PAL_EXTRA_SETTINGS
-export ADMIN_PASS SERVER_PASS
+export ADMIN_PASS SERVER_PASS PAL_CROSSPLAY
+export PUBLIC_IP="$IP"
 
 # DefaultPalWorldSettings.ini (全キー入りの雛形) を正として上書き項目を注入する。
 python3 - "$PAL_DIR/DefaultPalWorldSettings.ini" "$CONF_DIR/PalWorldSettings.ini" <<'PYEOF'
@@ -156,8 +167,9 @@ with open(src, encoding="utf-8") as f:
 m = re.search(r"OptionSettings=\((.*)\)", text)
 opts = {}
 if m:
-    # value 内にカンマは出ない前提 (Palworld の ini はフラットな key=value 列)
-    for kv in m.group(1).split(","):
+    # 括弧内のカンマでは分割しない。CrossplayPlatforms=(Steam,Xbox,PS5,Mac) のような
+    # 値があるため、単純な split(",") では設定が壊れる。
+    for kv in re.split(r",(?![^()]*\))", m.group(1)):
         if "=" in kv:
             k, v = kv.split("=", 1)
             opts[k.strip()] = v.strip()
@@ -168,9 +180,12 @@ overrides = {
     "AdminPassword": '"' + os.environ["ADMIN_PASS"] + '"',
     "ServerPassword": '"' + os.environ["SERVER_PASS"] + '"',
     "ServerPlayerMaxNum": os.environ["PAL_MAX_PLAYERS"],
+    "PublicIP": '"' + os.environ["PUBLIC_IP"] + '"',  # コミュニティ一覧への申告用
     "PublicPort": os.environ["PAL_GAME_PORT"],
     "RCONEnabled": "True",
     "RCONPort": "25575",
+    # コンソール勢 (PS5/Xbox) の参加に必須。欠けたプラットフォームは接続不可になる
+    "CrossplayPlatforms": "(" + os.environ.get("PAL_CROSSPLAY", "Steam,Xbox,PS5,Mac") + ")",
 }
 for kv in os.environ.get("PAL_EXTRA_SETTINGS", "").split(","):
     if "=" in kv:
@@ -188,10 +203,16 @@ chown -R palworld:palworld "$PAL_DIR/Pal/Saved"
 # ---------------------------------------------------------------------------
 # 6. systemd ユニット配置 → 起動
 # ---------------------------------------------------------------------------
+# -publiclobby: コミュニティサーバー一覧への掲載。PS5/Xbox は一覧経由でしか
+# 参加できないため、コンソール勢がいる場合は必須。
+PUBLIC_LOBBY_FLAG=""
+[ "${PAL_PUBLIC_LOBBY:-false}" = "true" ] && PUBLIC_LOBBY_FLAG="-publiclobby"
+
 for unit in /opt/palworld/systemd/*; do
   sed -e "s/@GAME_PORT@/$PAL_GAME_PORT/g" \
       -e "s/@MAX_PLAYERS@/$PAL_MAX_PLAYERS/g" \
       -e "s/@BACKUP_MIN@/$PAL_BACKUP_MINUTES/g" \
+      -e "s/@PUBLIC_LOBBY@/$PUBLIC_LOBBY_FLAG/g" \
       "$unit" > "/etc/systemd/system/$(basename "$unit")"
 done
 systemctl daemon-reload

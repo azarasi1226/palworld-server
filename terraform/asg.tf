@@ -46,6 +46,8 @@ resource "aws_launch_template" "server" {
     idle_minutes  = var.idle_shutdown_minutes
     backup_min    = var.backup_interval_minutes
     grace_minutes = var.boot_grace_minutes
+    public_lobby  = var.enable_public_lobby ? "true" : "false"
+    crossplay     = var.crossplay_platforms
     extra_settings = join(",", [
       for k, v in var.extra_pal_settings : "${k}=${v}"
     ])

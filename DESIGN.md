@@ -480,6 +480,7 @@ pal/
 ## 決定事項（設計時に未確定だったもの）
 
 - **Steam クエリポート 27015/udp**: デフォルト閉じる。`enable_steam_query_port = true` で開放可能
+- **コンソール対応 (PS5/Xbox)**: コンソール版には IP 直接入力が無く、コミュニティサーバー一覧経由でしか参加できない。`enable_public_lobby = true` で `-publiclobby` 起動 + `CrossplayPlatforms=(Steam,Xbox,PS5,Mac)` を設定。一覧は全世界公開のため `server_password` 必須運用とする
 - **Terraform state のバックエンド**: S3（専用バケット・バージョニング有効・`use_lockfile` による S3 ネイティブロック）。state には秘密が平文で入るためローカルに置かない。DynamoDB は使わない（部品最少）
 - **CloudWatch Logs へのログ常時転送**: 行わない。停止時に `logs/` へ S3 退避 + 稼働中は SSM Session Manager で `journalctl` を見る
 - **セーブの置き場所**: S3（EFS / EBS との比較は「設計判断」の節）

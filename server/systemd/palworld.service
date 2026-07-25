@@ -8,7 +8,7 @@ Type=simple
 User=palworld
 Group=palworld
 WorkingDirectory=/home/palworld/palserver
-ExecStart=/home/palworld/palserver/PalServer.sh -port=@GAME_PORT@ -players=@MAX_PLAYERS@ -useperfthreads -NoAsyncLoadingThread -UseMultithreadForDS
+ExecStart=/home/palworld/palserver/PalServer.sh -port=@GAME_PORT@ -players=@MAX_PLAYERS@ -useperfthreads -NoAsyncLoadingThread -UseMultithreadForDS @PUBLIC_LOBBY@
 Restart=on-failure
 RestartSec=10
 # RCON Shutdown / SIGTERM 後、自前のフラッシュに 90 秒まで猶予を与える

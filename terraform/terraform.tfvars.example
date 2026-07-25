@@ -30,6 +30,13 @@ extra_pal_settings = {
   # DeathPenalty = "All"   # None / Item / ItemAndEquipment / All
 }
 
+# --- PS5/Xbox (コンソール) 対応 --------------------------------------------
+# コンソール版は IP 直接入力が無く、コミュニティサーバー一覧経由でしか参加できない。
+# コンソール勢がいる場合は両方 true にし、server_password を必ず設定すること
+# (一覧は全世界に公開されるため、パスワード無しだと誰でも入れてしまう)。
+enable_public_lobby     = false
+enable_steam_query_port = false
+
 # --- 運用 ------------------------------------------------------------------
 idle_shutdown_minutes   = 15 # 0 で自動停止を無効化
 backup_interval_minutes = 5

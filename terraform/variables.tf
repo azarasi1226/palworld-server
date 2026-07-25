@@ -96,6 +96,22 @@ variable "enable_steam_query_port" {
   default     = false
 }
 
+variable "enable_public_lobby" {
+  description = <<-EOT
+    コミュニティサーバー一覧に掲載する (-publiclobby)。
+    PS5/Xbox 版には IP 直接入力が無く一覧経由でしか参加できないため、
+    コンソール勢がいる場合は true 必須。掲載する場合は server_password の設定を強く推奨。
+  EOT
+  type        = bool
+  default     = false
+}
+
+variable "crossplay_platforms" {
+  description = "参加を許可するプラットフォーム (CrossplayPlatforms)。欠けた環境からは接続不可"
+  type        = string
+  default     = "Steam,Xbox,PS5,Mac"
+}
+
 variable "extra_pal_settings" {
   description = <<-EOT
     PalWorldSettings.ini の OptionSettings に追記する key=value のマップ。
