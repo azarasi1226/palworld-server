@@ -1,0 +1,6 @@
+{
+  "name": "palworld-discord-bot",
+  "private": true,
+  "type": "module",
+  "description": "Discord slash commands for the Palworld spot server. AWS SDK v3 is provided by the Lambda runtime; no bundled dependencies."
+}
