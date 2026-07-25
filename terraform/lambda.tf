@@ -23,8 +23,9 @@ resource "aws_lambda_function" "discord" {
   timeout     = 120 # ワーカー実行 (SSM RunCommand の完了待ち等) を含む
   memory_size = 256
 
-  # URL が公開される以上、無署名リクエストの連打で課金が青天井にならないよう頭打ちにする。
-  reserved_concurrent_executions = 5
+  # reserved_concurrent_executions による予約は設定しない。
+  # 小規模アカウント (全体上限 10) では「未予約を 10 以上残す」制約に必ず抵触するため。
+  # 連打対策はアカウント全体の同時実行上限と Ed25519 署名検証 (即 401) で足りる。
 
   environment {
     variables = {

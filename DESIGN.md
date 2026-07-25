@@ -42,7 +42,7 @@ flowchart TB
     discord["💬 Discord ギルド<br>/pal start · stop · status · players · backup · restart"]
 
     subgraph aws["AWS (ap-northeast-1)"]
-        lambda["λ Lambda Function URL — Node.js 22 / 依存ゼロ<br>Ed25519 署名検証 → 3 秒以内に deferred 応答<br>自分自身を非同期 invoke してワーカー実行<br>予約済み同時実行数 = 5"]
+        lambda["λ Lambda Function URL — Node.js 22 / 依存ゼロ<br>Ed25519 署名検証 → 3 秒以内に deferred 応答<br>自分自身を非同期 invoke してワーカー実行"]
         eb["EventBridge<br>Spot 中断イベント / ASG 起動失敗イベント"]
         asg["AutoScalingGroup — min 0 / max 1 / desired 0<br>100% Spot · price-capacity-optimized<br>16GB 級 11 タイプ × 全 AZ に分散<br>CapacityRebalance + LifecycleHook (TERMINATING 300s)"]
         r53["Route53<br>pal.example.com — A レコード / TTL 60 秒"]
@@ -284,7 +284,9 @@ EFS が勝る点は起動速度（本体 10GB の復元が不要になる）の�
 - `discord_allowed_role_id` を設定すると、そのロール保持者のみ start/stop 可能
 - Function URL は `authorization_type = NONE`（Discord は SigV4 署名できないため必然）。
   認証は Ed25519 署名検証が担い、URL を知られても偽コマンドは打てない。
-  ただし無署名リクエストの連打で実行料が積まれないよう**予約済み同時実行数 = 5** で頭打ちにする
+  無署名リクエストは即 401 (1 回 $0.0000002 級) で、連打はアカウント全体の
+  同時実行上限が頭打ちにする（予約済み同時実行数は使わない — 小規模アカウントの
+  上限 10 では設定自体が不可能なため）
 - `/pal start` は ASG に `Terminating` 系のインスタンスがいる間は拒否する（排他制御の節を参照）
 
 Lambda は VPC に入れない。RCON を直接叩かず、インスタンスが 30 秒ごとに書く
@@ -484,4 +486,4 @@ pal/
 - **latest のバージョン履歴**: 48 時間 + 直近 10 世代。長期世代は 1 時間ごとの archive/ (30 日)
 - **DNS TTL**: 60 秒（復帰時の再接続を成立させるための必須条件）
 - **排他制御**: S3 ロック `lock/active.json`。Lambda 側の起動拒否は補助
-- **Lambda の保護**: Function URL は署名検証 + 予約済み同時実行数 5 で頭打ち
+- **Lambda の保護**: Function URL は署名検証で防御。連打はアカウントの同時実行上限で頭打ち（予約は小規模アカウントで設定不能のため使わない）
