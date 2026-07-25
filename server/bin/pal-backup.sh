@@ -75,15 +75,15 @@ fi
 
 SIZE=$(stat -c %s "$LEVEL_SAV")
 
+# 絶対下限は「空・切り詰めの検出」だけが目的なので 4KB に留める。
+# 新規ワールド直後の Level.sav は 15KB 程度しかない (実測)。
+# 破損検出の本命は下の前回比チェック。
+[ "$SIZE" -ge 4096 ] || fail_quarantine "Level.sav が小さすぎる (${SIZE}B < 4KB)"
+
 if [ "$PREV_SIZE" = "None" ] || [ -z "$PREV_SIZE" ]; then
-  # 初回: 新規ワールド直後は小さいことがあるため下限のみ 100KB に緩和
-  [ "$SIZE" -ge 102400 ] || fail_quarantine "Level.sav が小さすぎる (${SIZE}B < 100KB, 初回基準)"
   log "bootstrap mode: first backup (Level.sav ${SIZE}B)"
-else
-  [ "$SIZE" -ge 1048576 ] || fail_quarantine "Level.sav が小さすぎる (${SIZE}B < 1MB)"
-  if [ "$SIZE" -lt $(( PREV_SIZE / 2 )) ]; then
-    fail_quarantine "Level.sav が前回の 50% 未満に縮んだ (${SIZE}B < ${PREV_SIZE}B/2)。破損か初期化の疑い"
-  fi
+elif [ "$SIZE" -lt $(( PREV_SIZE / 2 )) ]; then
+  fail_quarantine "Level.sav が前回の 50% 未満に縮んだ (${SIZE}B < ${PREV_SIZE}B/2)。破損か初期化の疑い"
 fi
 
 # ---------------------------------------------------------------------------

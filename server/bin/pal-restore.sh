@@ -31,7 +31,8 @@ try_candidate() {
     return 1
   fi
   size=$(stat -c %s "$lv")
-  if [ "$size" -lt 102400 ]; then
+  # 新規ワールド直後の Level.sav は 15KB 程度のため、下限は 4KB (空・切り詰め検出のみ)
+  if [ "$size" -lt 4096 ]; then
     log "candidate rejected ($desc): Level.sav too small (${size}B)"
     return 1
   fi
