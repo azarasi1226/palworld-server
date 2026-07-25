@@ -42,7 +42,7 @@ flowchart TB
     discord["💬 Discord ギルド<br>/pal start · stop · status · players · backup · restart"]
 
     subgraph aws["AWS (ap-northeast-1)"]
-        lambda["λ Lambda Function URL — Node.js 22 / 依存ゼロ<br>Ed25519 署名検証 → 3 秒以内に deferred 応答<br>自分自身を非同期 invoke してワーカー実行"]
+        lambda["API Gateway (HTTP API) → λ Lambda — Node.js 22 / 依存ゼロ<br>Ed25519 署名検証 → 3 秒以内に deferred 応答<br>自分自身を非同期 invoke してワーカー実行<br>スロットリング 5 req/s"]
         eb["EventBridge<br>Spot 中断イベント / ASG 起動失敗イベント"]
         asg["AutoScalingGroup — min 0 / max 1 / desired 0<br>100% Spot · price-capacity-optimized<br>16GB 級 11 タイプ × 全 AZ に分散<br>CapacityRebalance + LifecycleHook (TERMINATING 300s)"]
         r53["Route53<br>pal.example.com — A レコード / TTL 60 秒"]
@@ -249,7 +249,7 @@ EFS が勝る点は起動速度（本体 10GB の復元が不要になる）の�
 | 判断 | 効果 |
 | --- | --- |
 | NAT ゲートウェイを置かない（パブリックサブネット直置き） | −$40/月 |
-| API Gateway を使わない（Function URL） | −$1/100 万 req・部品 4 つ削減 |
+| ~~API Gateway を使わない（Function URL）~~ → 組織の RCP により断念、HTTP API へ | 部品 +4 / $1/100 万 req（実質 $0）。代わりにスロットリングを獲得 |
 | Lambda 依存パッケージゼロ | ビルド工程・node_modules 不要 |
 | AMI を焼かない（スクリプトは S3 配布） | イメージ更新パイプライン不要。修正は apply + 再起動で反映 |
 | ログの常時転送なし（停止時に S3 退避のみ） | CloudWatch Logs 課金回避 |
@@ -275,18 +275,20 @@ EFS が勝る点は起動速度（本体 10GB の復元が不要になる）の�
 
 ### Discord Bot (Lambda / Node.js 22)
 
-- **Function URL** を使用（API Gateway 不要 = コストと構成要素を削減）
+- 入口は **API Gateway (HTTP API)**。設計当初は Function URL（コストと部品の削減）だったが、
+  この組織には「Function URL の匿名呼び出しを禁止する」ガードレール (RCP) があり、
+  リソースポリシーを正しく設定しても 403 になるため切り替えた。
+  HTTP API のペイロード形式 2.0 は Function URL とイベント構造が同一で、Lambda コードは無変更。
+  $1/100 万リクエスト（本用途では実質 $0）
 - **依存パッケージゼロ**。Ed25519 検証は Node 22 の `node:crypto` の `crypto.verify(null, ...)` で
   ネイティブに可能なため、PyNaCl 相当のバンドルが要らない（Python を選ばなかった理由）
 - Discord は 3 秒以内の応答を要求するため、**deferred (type 5) を即返し**、
   自分自身を `InvokeAsync` して重い処理を実行、完了後に
   `PATCH /webhooks/{app_id}/{token}/messages/@original` で結果を差し替える
 - `discord_allowed_role_id` を設定すると、そのロール保持者のみ start/stop 可能
-- Function URL は `authorization_type = NONE`（Discord は SigV4 署名できないため必然）。
+- エンドポイントは認証なしの公開 URL（Discord は SigV4 署名できないため必然）。
   認証は Ed25519 署名検証が担い、URL を知られても偽コマンドは打てない。
-  無署名リクエストは即 401 (1 回 $0.0000002 級) で、連打はアカウント全体の
-  同時実行上限が頭打ちにする（予約済み同時実行数は使わない — 小規模アカウントの
-  上限 10 では設定自体が不可能なため）
+  無署名リクエストは即 401。連打は API Gateway のスロットリング (5 req/s) が頭打ちにする
 - `/pal start` は ASG に `Terminating` 系のインスタンスがいる間は拒否する（排他制御の節を参照）
 
 Lambda は VPC に入れない。RCON を直接叩かず、インスタンスが 30 秒ごとに書く
@@ -486,4 +488,5 @@ pal/
 - **latest のバージョン履歴**: 48 時間 + 直近 10 世代。長期世代は 1 時間ごとの archive/ (30 日)
 - **DNS TTL**: 60 秒（復帰時の再接続を成立させるための必須条件）
 - **排他制御**: S3 ロック `lock/active.json`。Lambda 側の起動拒否は補助
-- **Lambda の保護**: Function URL は署名検証で防御。連打はアカウントの同時実行上限で頭打ち（予約は小規模アカウントで設定不能のため使わない）
+- **Lambda の保護**: 署名検証で防御。連打は API Gateway スロットリング (5 req/s) で頭打ち
+- **入口は API Gateway (HTTP API)**: Function URL は組織の RCP（匿名呼び出し禁止）と衝突するため不採用。デプロイ先の組織ガードレールは設計の前提条件になる、という教訓も込みで記録

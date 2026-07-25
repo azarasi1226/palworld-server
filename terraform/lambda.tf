@@ -1,6 +1,7 @@
 # ---------------------------------------------------------------------------
 # Discord Bot 本体。
-# API Gateway は使わず Function URL に Discord から直接 POST させる。
+# 入口は API Gateway (HTTP API)。当初は Function URL だったが、この組織には
+# 「Function URL の匿名呼び出しを禁止する」ガードレール (RCP) があり 403 になるため。
 # 認証は Ed25519 署名検証 (Discord の秘密鍵でしか作れない) が担う。
 # ---------------------------------------------------------------------------
 
@@ -43,19 +44,45 @@ resource "aws_lambda_function" "discord" {
   }
 }
 
-resource "aws_lambda_function_url" "discord" {
-  function_name      = aws_lambda_function.discord.function_name
-  authorization_type = "NONE" # Discord は SigV4 不可。認証は Ed25519 署名検証で行う
+# HTTP API (v2)。ペイロード形式 2.0 は Function URL とイベント構造が同一のため、
+# Lambda 側のコードは無変更で済む。
+resource "aws_apigatewayv2_api" "discord" {
+  name          = "${local.name}-discord"
+  protocol_type = "HTTP"
 }
 
-# Function URL の公開呼び出し許可。コンソール作成時は自動付与されるが
-# Terraform では明示が必要 (無いと全リクエストが 403 になる)。
-resource "aws_lambda_permission" "function_url" {
-  statement_id           = "AllowPublicFunctionUrl"
-  action                 = "lambda:InvokeFunctionUrl"
-  function_name          = aws_lambda_function.discord.function_name
-  principal              = "*"
-  function_url_auth_type = "NONE"
+resource "aws_apigatewayv2_integration" "discord" {
+  api_id                 = aws_apigatewayv2_api.discord.id
+  integration_type       = "AWS_PROXY"
+  integration_uri        = aws_lambda_function.discord.invoke_arn
+  integration_method     = "POST"
+  payload_format_version = "2.0"
+}
+
+resource "aws_apigatewayv2_route" "discord" {
+  api_id    = aws_apigatewayv2_api.discord.id
+  route_key = "POST /"
+  target    = "integrations/${aws_apigatewayv2_integration.discord.id}"
+}
+
+resource "aws_apigatewayv2_stage" "discord" {
+  api_id      = aws_apigatewayv2_api.discord.id
+  name        = "$default"
+  auto_deploy = true
+
+  # 公開エンドポイントの連打対策。Discord の正規トラフィックは毎秒数回も来ない。
+  default_route_settings {
+    throttling_rate_limit  = 5
+    throttling_burst_limit = 10
+  }
+}
+
+resource "aws_lambda_permission" "apigateway" {
+  statement_id  = "AllowApiGatewayInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.discord.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_apigatewayv2_api.discord.execution_arn}/*/*"
 }
 
 # ---------------------------------------------------------------------------

@@ -1,6 +1,6 @@
 output "interactions_endpoint_url" {
   description = "Discord Developer Portal の Interactions Endpoint URL に登録する URL"
-  value       = aws_lambda_function_url.discord.function_url
+  value       = "${aws_apigatewayv2_api.discord.api_endpoint}/"
 }
 
 output "server_address" {
