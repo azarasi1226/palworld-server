@@ -18,7 +18,7 @@ Discord から起動・停止できる、AWS スポットインスタンス上�
 | --- | --- | --- |
 | 1 | **AWS アカウント** と管理者相当の IAM 権限 | VPC / EC2 / S3 / Lambda / IAM / Route53 / SSM を作成できること |
 | 2 | **AWS CLI がローカルで認証済み** | `aws sts get-caller-identity` が成功すること |
-| 3 | **Terraform >= 1.6** | `terraform version` で確認 |
+| 3 | **Terraform >= 1.10** | `terraform version` で確認（state の S3 ネイティブロックに必要） |
 | 4 | **Node.js >= 18** | スラッシュコマンド登録スクリプトの実行に使用 |
 | 5 | **独自ドメイン + Route53 パブリックホストゾーン** | 例: `example.com` のゾーンが**すでに Route53 に存在**していること。接続先は `pal.example.com` のようになる |
 | 6 | **Discord サーバーの管理権限** | Bot 導入とチャンネル作成ができること |
@@ -74,9 +74,21 @@ cp terraform.tfvars.example terraform.tfvars
 
 ### 4. デプロイする
 
+Terraform の state（構成の管理台帳。**webhook URL などの秘密が平文で入る**）は
+ローカルではなく専用の S3 バケットに置きます。まず state 用バケットを 1 回だけ作成します
+（`<ACCOUNT_ID>` は `aws sts get-caller-identity --query Account --output text` の値に置き換え）:
+
+```bash
+aws s3api create-bucket --bucket tfstate-palworld-<ACCOUNT_ID> --region ap-northeast-1 --create-bucket-configuration LocationConstraint=ap-northeast-1
+aws s3api put-bucket-versioning --bucket tfstate-palworld-<ACCOUNT_ID> --versioning-configuration Status=Enabled
+aws s3api put-public-access-block --bucket tfstate-palworld-<ACCOUNT_ID> --public-access-block-configuration BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
+```
+
+続いてデプロイ:
+
 ```bash
 cd terraform
-terraform init
+terraform init -backend-config="bucket=tfstate-palworld-<ACCOUNT_ID>"
 terraform apply   # 内容を確認して yes
 ```
 

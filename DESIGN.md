@@ -138,7 +138,7 @@ EC2 は完全に使い捨て。状態はすべて S3 にあり、インスタン
 
 ### 層 3: 緊急停止シーケンス（目標 30 秒 / 上限 100 秒）
 
-```
+```text
  1. Discord へ「⚠ スポット中断警告。セーブして退避します」を webhook 通知  (~1s)
  2. RCON Broadcast  ※Palworld の仕様でスペース不可 → アンダースコア置換     (~1s)
  3. RCON Save       セーブをディスクへフラッシュ                             (~2s)
@@ -364,7 +364,7 @@ ASG / EC2 の実際の状態を正として表示する。
 
 ## 作成するファイル
 
-```
+```text
 pal/
 ├── DESIGN.md                          この設計書
 ├── README.md                          セットアップ手順・運用手順・トラブルシュート
@@ -478,7 +478,7 @@ pal/
 ## 決定事項（設計時に未確定だったもの）
 
 - **Steam クエリポート 27015/udp**: デフォルト閉じる。`enable_steam_query_port = true` で開放可能
-- **Terraform state のバックエンド**: デフォルトはローカル。チーム運用なら S3 + DynamoDB へ変更する（README に手順）
+- **Terraform state のバックエンド**: S3（専用バケット・バージョニング有効・`use_lockfile` による S3 ネイティブロック）。state には秘密が平文で入るためローカルに置かない。DynamoDB は使わない（部品最少）
 - **CloudWatch Logs へのログ常時転送**: 行わない。停止時に `logs/` へ S3 退避 + 稼働中は SSM Session Manager で `journalctl` を見る
 - **セーブの置き場所**: S3（EFS / EBS との比較は「設計判断」の節）
 - **latest のバージョン履歴**: 48 時間 + 直近 10 世代。長期世代は 1 時間ごとの archive/ (30 日)
