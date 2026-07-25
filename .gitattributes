@@ -1,0 +1,7 @@
+# server/ 以下は Terraform がそのまま S3 → Linux へ配布する。
+# CRLF が混ざると bash が起動できなくなるため、常に LF でチェックアウトさせる。
+*.sh    text eol=lf
+*.py    text eol=lf
+*.tftpl text eol=lf
+*.service text eol=lf
+*.timer text eol=lf
