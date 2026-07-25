@@ -1,0 +1,12 @@
+[Unit]
+Description=Palworld idle auto-shutdown watcher
+After=palworld.service
+
+[Service]
+Type=simple
+ExecStart=/opt/palworld/bin/pal-idle-watcher.sh
+Restart=on-failure
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target

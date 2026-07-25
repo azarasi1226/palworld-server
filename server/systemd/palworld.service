@@ -1,0 +1,19 @@
+[Unit]
+Description=Palworld Dedicated Server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=palworld
+Group=palworld
+WorkingDirectory=/home/palworld/palserver
+ExecStart=/home/palworld/palserver/PalServer.sh -port=@GAME_PORT@ -players=@MAX_PLAYERS@ -useperfthreads -NoAsyncLoadingThread -UseMultithreadForDS
+Restart=on-failure
+RestartSec=10
+# RCON Shutdown / SIGTERM 後、自前のフラッシュに 90 秒まで猶予を与える
+TimeoutStopSec=90
+KillSignal=SIGTERM
+
+[Install]
+WantedBy=multi-user.target

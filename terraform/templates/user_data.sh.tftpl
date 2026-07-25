@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# 最小ブートストラップ。ロジックは持たず、S3 のスクリプト一式に委譲する。
+# (スクリプト修正が AMI 再作成なしで次回起動から反映されるようにするため)
+set -euo pipefail
+exec > >(tee /var/log/pal-bootstrap.log) 2>&1
+
+echo "[bootstrap] $(date -Is) start"
+
+# 実行時設定。install.sh と各スクリプトは common.sh 経由でこれを読む。
+mkdir -p /etc/palworld
+cat > /etc/palworld/env <<'EOF'
+PAL_BUCKET="${bucket}"
+PAL_REGION="${region}"
+PAL_PROJECT="${project}"
+PAL_FQDN="${fqdn}"
+PAL_ZONE_ID="${zone_id}"
+PAL_GAME_PORT="${game_port}"
+PAL_SERVER_NAME="${server_name}"
+PAL_SERVER_DESC="${server_desc}"
+PAL_MAX_PLAYERS="${max_players}"
+PAL_IDLE_MINUTES="${idle_minutes}"
+PAL_BACKUP_MINUTES="${backup_min}"
+PAL_GRACE_MINUTES="${grace_minutes}"
+PAL_EXTRA_SETTINGS="${extra_settings}"
+EOF
+chmod 0644 /etc/palworld/env
+
+# Ubuntu 24.04 は AWS CLI 非同梱。snap が最速で確実。
+if ! command -v aws >/dev/null 2>&1; then
+  snap install aws-cli --classic
+fi
+
+# スクリプト一式を取得して実行権限を付与。
+aws s3 sync "s3://${bucket}/bootstrap/" /opt/palworld/ --region "${region}" --no-progress
+find /opt/palworld -name '*.sh' -o -name '*.py' | xargs chmod +x
+
+exec /opt/palworld/install.sh

@@ -1,0 +1,14 @@
+[Unit]
+Description=Palworld spot interruption guardian (emergency save)
+After=palworld.service
+# 停止シーケンス自体を guardian が担うため、palworld と運命共同体にしない
+# (palworld が落ちても監視は続ける)
+
+[Service]
+Type=simple
+ExecStart=/opt/palworld/bin/pal-guardian.sh
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

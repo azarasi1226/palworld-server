@@ -1,0 +1,6 @@
+[Unit]
+Description=Palworld periodic save backup to S3
+
+[Service]
+Type=oneshot
+ExecStart=/opt/palworld/bin/pal-backup.sh

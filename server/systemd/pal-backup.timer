@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Palworld backup every @BACKUP_MIN@ minutes
+
+[Timer]
+OnBootSec=@BACKUP_MIN@min
+OnUnitActiveSec=@BACKUP_MIN@min
+# 精度を上げる (デフォルト 1 分の揺らぎを抑える)
+AccuracySec=10s
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,35 @@
+# コピーして terraform.tfvars を作成し、値を埋める。
+# terraform.tfvars は秘匿値を含むため git にコミットしないこと。
+
+aws_region = "ap-northeast-1"
+
+# --- Route53 (必須) --------------------------------------------------------
+# 既存のパブリックホストゾーン名。接続先は <server_hostname>.<zone> になる。
+route53_zone_name = "example.com"
+server_hostname   = "pal"
+
+# --- Discord (必須) --------------------------------------------------------
+# Discord Developer Portal > General Information から取得
+discord_application_id = "123456789012345678"
+discord_public_key     = "abcdef0123456789..." # PUBLIC KEY (64 桁の 16 進)
+
+# 通知チャンネルの Webhook URL (チャンネル設定 > 連携サービス > ウェブフック)
+discord_webhook_url = "https://discord.com/api/webhooks/..."
+
+# start/stop を許可するロール ID (空なら全員許可)
+discord_allowed_role_id = ""
+
+# --- ゲーム設定 ------------------------------------------------------------
+server_name     = "My Palworld Server"
+server_password = "" # 空ならパスワード無し
+max_players     = 16
+
+# PalWorldSettings.ini の OptionSettings に追記したい項目
+extra_pal_settings = {
+  # ExpRate      = "1.000000"
+  # DeathPenalty = "All"   # None / Item / ItemAndEquipment / All
+}
+
+# --- 運用 ------------------------------------------------------------------
+idle_shutdown_minutes   = 15 # 0 で自動停止を無効化
+backup_interval_minutes = 5

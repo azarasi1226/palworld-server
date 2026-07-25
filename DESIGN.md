@@ -1,0 +1,438 @@
+# Palworld スポットサーバー管理システム 設計書
+
+## Context
+
+友人内でパルワールド専用サーバーを運用したいが、常時起動の EC2 は高い（16GB 級オンデマンドで月 $180 前後）。
+遊ぶ時だけ Discord から起動・停止し、スポットインスタンスで 7〜8 割引で走らせたい。
+
+ただしスポットには「2 分前通知で強制回収される」という制約がある。パルワールドのセーブは
+サーバープロセスがメモリ上に持っており、落ち方が悪いと**数十分〜数時間分のワールド進行が消える**。
+このシステムの設計上の中核はコスト削減そのものではなく、**「いつ落とされても直前の状態が S3 に残っている」ことを保証する仕組み**にある。
+
+到達点:
+
+- Discord の `/pal start` `/pal stop` で起動・停止できる
+- スポット中断されてもセーブが失われず、自動的に別インスタンスで復帰する
+- 15 分無人で自動停止し、消し忘れによる課金が発生しない
+- `terraform apply` 一発で全部立ち上がる
+
+---
+
+## 全体アーキテクチャ
+
+```mermaid
+flowchart TB
+    player(["🎮 プレイヤー"])
+    discord["💬 Discord ギルド<br>/pal start · stop · status · players · backup · restart"]
+
+    subgraph aws["AWS (ap-northeast-1)"]
+        lambda["λ Lambda Function URL — Node.js 22 / 依存ゼロ<br>Ed25519 署名検証 → 3 秒以内に deferred 応答<br>自分自身を非同期 invoke してワーカー実行<br>予約済み同時実行数 = 5"]
+        eb["EventBridge<br>Spot 中断イベント / ASG 起動失敗イベント"]
+        asg["AutoScalingGroup — min 0 / max 1 / desired 0<br>100% Spot · price-capacity-optimized<br>16GB 級 11 タイプ × 全 AZ に分散<br>CapacityRebalance + LifecycleHook (TERMINATING 300s)"]
+        r53["Route53<br>pal.example.com — A レコード / TTL 60 秒"]
+
+        subgraph ec2["EC2 — Ubuntu 24.04 / x86_64 / gp3 40GB / 使い捨て"]
+            pal["palworld.service<br>PalServer 本体 (steamcmd)"]
+            guardian["pal-guardian.service ★中断検知の心臓部<br>5 秒ごと: Spot 中断通知 / リバランス推奨 / Terminating:Wait"]
+            backupt["pal-backup.timer<br>5 分ごと RCON Save → 原子的 PUT"]
+            idle["pal-idle.service<br>15 分無人で自動セーブ停止"]
+            statust["pal-status.timer<br>30 秒ごと status.json + ロック心拍"]
+        end
+
+        subgraph s3["S3 バケット (バージョニング有効) — セーブの正"]
+            latest["saves/latest.tar.zst<br>単一オブジェクト = 原子的 / 版履歴 48h"]
+            archive["saves/archive/&lt;ts&gt;.tar.zst<br>1 時間ごとの世代 (30 日保持)"]
+            quarantine["saves/quarantine/<br>整合性チェック落ちを隔離"]
+            lock["lock/active.json<br>排他ロック (世代逆転の防止)"]
+            cache["gamecache/palserver.tar.zst<br>本体キャッシュ (起動 5 分 → 90 秒)"]
+            statusj["status.json / logs/"]
+        end
+    end
+
+    discord -- "スラッシュコマンド" --> lambda
+    lambda -- "SetDesiredCapacity 0 ⇄ 1" --> asg
+    eb -- "中断 / 復帰失敗" --> lambda
+    lambda -. "通知 B 系統 (必ず届く)" .-> discord
+    asg -- "起動" --> ec2
+    ec2 -- "boot 時に自 IP を UPSERT" --> r53
+    player -- "名前解決" --> r53
+    player == "UDP 8211" ==> pal
+    guardian -- "緊急セーブ → PUT" --> latest
+    backupt -- "定期 PUT" --> latest
+    backupt --> archive
+    statust --> statusj
+    statust --> lock
+    ec2 -. "通知 A 系統 (webhook: 起動完了 / 中断警告 / セーブ結果)" .-> discord
+    lambda -- "status 読取" --> statusj
+    cache -- "起動時に復元" --> pal
+    latest -- "起動時に復元 (検証 + 版履歴フォールバック)" --> pal
+
+    style guardian fill:#7c2d2d,color:#fff
+    style latest fill:#1e4d2b,color:#fff
+    style lock fill:#4d3a1e,color:#fff
+```
+
+（`quarantine` へは整合性チェックに落ちたアーカイブのみが退避される。層 4 参照）
+
+EC2 は完全に使い捨て。状態はすべて S3 にあり、インスタンスは「S3 から復元して走らせるだけの器」。
+
+---
+
+## 中核設計: セーブを失わないための多層防御
+
+これが本システムで最も重要な部分。単一の仕組みには頼らず 5 層で守る。
+
+### 層 1: 定期バックアップ（5 分ごと）
+
+`pal-backup.timer` が RCON `Save` を送ってフラッシュさせた後、`Pal/Saved/SaveGames` を
+**まずローカルにスナップショットコピーし、コピー側を** tar+zstd で固めて
+**単一オブジェクトとして** `saves/latest.tar.zst` に PUT する。
+
+- 単一 PUT なので**原子的**。アップロード中に電源が落ちても S3 上の既存オブジェクトは壊れない
+  （`aws s3 sync` によるファイル単位同期だと、途中で切られた場合に中途半端な状態が残るため採用しない）
+- **スナップショットコピーを挟む理由**: Palworld は自前のオートセーブも走らせるため、
+  ライブディレクトリを直接 tar すると書き込みと重なって「半分新しく半分古い」アーカイブができうる。
+  先にローカルコピー（数百 MB で 1〜2 秒）してから固めることで一貫した断面を取る
+- バケットはバージョニング有効。同じキーに上書きしても過去世代は自動的に残る
+- 最悪ケースでもロストは 5 分以内
+
+**バージョン履歴の保持期間は 48 時間**（+ 直近 10 世代は無条件保持）。
+5 分間隔の上書きを 30 日分残すと非現行バージョンだけで 160GB 級 (月 $4 前後) に膨らむため、
+「壊れたセーブで上書きされた事故からのロールバック」に必要な 48 時間に絞る。
+30 日スパンの世代管理は、バックアップスクリプトが 1 時間ごとに `saves/archive/<ts>.tar.zst` へ
+コピーする世代アーカイブが担う。
+
+### 層 2: スポット中断・回収の検知（2 分前通知）
+
+`pal-guardian.service` が 5 秒間隔で 3 つのシグナルを監視する:
+
+| 監視対象 | 取得元 | 猶予 |
+|---|---|---|
+| Spot 中断通知 | IMDSv2 `/latest/meta-data/spot/instance-action` | 約 2 分 |
+| リバランス推奨 | IMDSv2 `/latest/meta-data/events/recommendations/rebalance` | 中断通知より**早い**（数分〜） |
+| ASG ライフサイクル | `describe-auto-scaling-instances` が `Terminating:Wait` | 300 秒 |
+
+どれか 1 つでも立ったら即座に緊急停止シーケンスへ。フラグファイルで多重起動を防ぐ。
+
+リバランス推奨は中断通知より先に来ることが多く、実質的に「2 分」より長い猶予が得られるのが利点。
+
+### 層 3: 緊急停止シーケンス（目標 30 秒 / 上限 100 秒）
+
+```
+ 1. Discord へ「⚠ スポット中断警告。セーブして退避します」を webhook 通知  (~1s)
+ 2. RCON Broadcast  ※Palworld の仕様でスペース不可 → アンダースコア置換     (~1s)
+ 3. RCON Save       セーブをディスクへフラッシュ                             (~2s)
+ 4. sleep 3         書き込み完了待ち
+ 5. SaveGames をローカルへスナップショットコピー                             (~2s)
+ 6. 整合性チェック → tar + zstd -3 -T0 でアーカイブ作成                      (~5s)
+ 7. S3 へ PUT (saves/latest.tar.zst)                                         (~3s)
+ 8. RCON Shutdown → プロセス終了                                             (~5s)
+ 9. journalctl のログを logs/ へ退避
+10. lock/active.json を削除 ※必ずセーブのアップロード後 (排他制御の節を参照)
+11. CompleteLifecycleAction (ASG 経由の停止の場合)
+12. Discord へ結果通知 (成功: ロスト 0 分 / 失敗: ロスト見込みを明示。通知設計の節を参照)
+```
+
+余裕は十分。2 分の猶予に対して 30 秒程度で完了する見込み。
+
+**なぜ 2 分で足りるか**: セーブデータの実体は数百 MB。zstd -3 は並列圧縮で 1GB/s 級、
+S3 への PUT も同一リージョン内で 100MB/s 超。ボトルネックにならない。
+
+### 層 4: 整合性チェック（壊れたセーブで上書きしない）
+
+アップロード前に必ず検証し、1 つでも落ちたら `saves/latest.tar.zst` は**触らず** `saves/quarantine/` へ退避 + Discord 警告:
+
+- `Level.sav` が存在し、サイズが 1MB 以上
+- 前回バックアップの `Level.sav` サイズの 50% 未満に縮んでいない（破損・初期化の検出）
+- 作成した tar が `tar -tf` で読める
+
+「バックアップが失敗した」より「良いバックアップを壊れたデータで上書きした」ほうが致命的なので、
+疑わしい場合は必ず既存を温存する側に倒す。
+
+**初回ブートストラップの例外**: S3 に前回バックアップが存在しない初回起動時は、
+「前回比 50%」チェックは対象が無いのでスキップし、サイズ下限も 100KB に緩和する
+（新規ワールド直後の `Level.sav` は 1MB 未満になりうるため）。
+2 回目以降は S3 に前回が存在するため、自動的に通常の厳格モードへ移行する。
+
+### 層 5: 復元時のフォールバック
+
+起動時に `saves/latest.tar.zst` を取得 → 検証 → 展開。検証に失敗したら
+S3 のバージョン履歴を新しい順に辿り、最初に検証を通ったものを使う。それも全滅なら
+`saves/archive/` の最新へ。
+
+`saves/latest.tar.zst` 自体が存在しない場合は**初回起動**とみなし、新規ワールドとして起動する
+（`archive/` や quarantine が存在するのに latest だけ無い場合は異常なので、起動を中断して Discord に警告）。
+
+### 中断されたあとの自動復帰
+
+ASG の `CapacityRebalance = true` + `max_size = 1` の組み合わせにより、
+中断されたインスタンスが終了した後、ASG が自動的に別のインスタンスタイプ / AZ で再起動する。
+新インスタンスは S3 から最新セーブを復元し、Route53 を自分の IP に更新するので、
+**プレイヤー側は数分待って再接続するだけ**で続きから遊べる。
+このために **A レコードの TTL は 60 秒**とする。TTL が長いとクライアントが旧 IP を
+キャッシュし続け、復帰したのに誰も繋げない状態になる。
+
+### 排他制御: S3 ロック（世代逆転・スプリットブレインの防止）
+
+`max_size = 1` だけでは防げない事故がある。**停止処理中に `/pal start` が打たれるケース**:
+
+```text
+t=0s   /stop  → 旧インスタンスがセーブ処理を開始
+t=5s   /start → 終了処理中のインスタンスは台数にカウントされないため、新インスタンスが即起動
+t=15s  新インスタンスが S3 から復元 ← これは【古いセーブ】
+t=25s  旧インスタンスがセーブ完了、S3 へ【新しいセーブ】を PUT して終了
+t=5m   新インスタンスの定期バックアップが【古いセーブ】で S3 を上書き ← 進行が静かに消える
+```
+
+対策は 2 層:
+
+1. **Lambda 側**: ASG に `Terminating` 系のインスタンスがいる間は `/pal start` を拒否し
+   「停止処理中です。完了までお待ちください」と返す（体感の改善。ただし Lambda を経由しない
+   経路 = スポット中断後の自動復帰では効かない）
+2. **S3 ロック** (`lock/active.json`): 正しさの保証はこちらが担う
+   - 稼働中インスタンスが 30 秒ごとにインスタンス ID + ハートビート時刻を書く
+   - 停止シーケンスの**最後**（セーブのアップロード完了後）に削除する
+   - 新インスタンスは**復元より前に**、ロックが消えるか陳腐化（90 秒以上更新なし = 前任者の突然死）
+     するまで待つ
+
+これで「新インスタンスが復元するセーブは、必ず前任者の最終アップロード以降のもの」が
+どの経路（Discord 操作・スポット中断・コンソール操作）でも保証される。
+なお ASG のキャパシティリバランス時の起動順序（終了先行か起動先行か）に依存しない設計とし、
+`max_size = 1` は同時起動台数の上限としてのみ扱う。
+
+---
+
+## 設計判断: セーブの置き場所に S3 を選んだ理由 (vs EFS / EBS)
+
+| 観点 | S3 (採用) | EFS | EBS |
+|---|---|---|---|
+| 中断時の安全性 | ◎ 検証済み tar の原子的 PUT のみ。書きかけが正に混入しない | ✕ セーブ中に回収されると**書きかけの Level.sav が唯一の実体**として残る | ✕ 同左 |
+| 世代管理 | ◎ バージョニングで自動 | ✕ AWS Backup 等を別途構築 | △ スナップショット運用 |
+| ゲームへの I/O 影響 | ◎ セーブはローカル gp3。退避は別プロセスで非同期 | ✕ NFS レイテンシ (~1ms/IO) で**セーブのたび全員がカクつく** | ◎ ローカル同等 |
+| コスト (15GB) | 約 $0.4/月 | 約 $5/月 + **読み書き課金** (5 分毎のセーブ書込だけでインスタンス代を超えうる) | 約 $1.4/月 |
+| AZ 制約 | ◎ リージョナル | ◎ リージョナル | ✕ **AZ 固定** → スポットのプールが 44→11 に減り中断されやすくなる |
+
+決め手は 1 行目。本システムの前提は「いつ殺されるか分からない」であり、
+ライブなファイルシステムを正にすると書きかけデータがそのまま正になる経路が残る。
+
+EFS が勝る点は起動速度（本体 10GB の復元が不要になる）のみ。現状は S3 キャッシュで
+90〜150 秒に収まる見込みのため不採用だが、これが許容できなくなった場合は
+**ゲーム本体のみ EFS・セーブは S3** のハイブリッドを検討する
+（本体は読み取り中心なので EFS の弱点をどれも踏まない）。
+
+---
+
+## コンポーネント詳細
+
+### Discord Bot (Lambda / Node.js 22)
+
+- **Function URL** を使用（API Gateway 不要 = コストと構成要素を削減）
+- **依存パッケージゼロ**。Ed25519 検証は Node 22 の `node:crypto` の `crypto.verify(null, ...)` で
+  ネイティブに可能なため、PyNaCl 相当のバンドルが要らない（Python を選ばなかった理由）
+- Discord は 3 秒以内の応答を要求するため、**deferred (type 5) を即返し**、
+  自分自身を `InvokeAsync` して重い処理を実行、完了後に
+  `PATCH /webhooks/{app_id}/{token}/messages/@original` で結果を差し替える
+- `discord_allowed_role_id` を設定すると、そのロール保持者のみ start/stop 可能
+- Function URL は `authorization_type = NONE`（Discord は SigV4 署名できないため必然）。
+  認証は Ed25519 署名検証が担い、URL を知られても偽コマンドは打てない。
+  ただし無署名リクエストの連打で実行料が積まれないよう**予約済み同時実行数 = 5** で頭打ちにする
+- `/pal start` は ASG に `Terminating` 系のインスタンスがいる間は拒否する（排他制御の節を参照）
+
+Lambda は VPC に入れない。RCON を直接叩かず、インスタンスが 30 秒ごとに書く
+`status.json` を S3 から読むことで接続人数を知る。これにより VPC Lambda の
+コールドスタート遅延と ENI 管理を回避している。`/backup` などインスタンスへの
+即時指示が必要なものだけ SSM RunCommand を使う。
+
+**status.json の鮮度チェック**: インスタンスが突然死すると最後の status.json が残り続ける。
+Lambda はタイムスタンプが 90 秒以上古い場合その内容を信用せず「情報が古い」と明示し、
+ASG / EC2 の実際の状態を正として表示する。
+
+### Discord 通知設計
+
+通知は**2 系統独立**。インスタンスがハングして無言で消えるのが最悪パターンなので、
+インスタンス発の詳しい通知と、AWS 発の必ず届く通知を併用する。
+
+| 経路 | 発火元 | 内容 |
+|---|---|---|
+| A: インスタンス発 (webhook) | guardian / backup / idle / 起動処理 | 起動完了+接続先 / 中断警告 / セーブ結果 / アイドル停止 |
+| B: AWS 発 (EventBridge → Lambda) | Spot 中断イベント / ASG 起動失敗イベント | 「中断された」「復帰できない」の事実のみ。インスタンスの生死と無関係に届く |
+
+**ロスト見込みの明示**: 中断時に利用者が知りたいのは「どこまで戻るか」。
+緊急セーブ成功なら `ロスト: 0 分`、失敗なら status.json の最終バックアップ時刻から
+`⚠ ロスト見込み: 約 4 分 (21:30 時点まで巻き戻ります)` と具体的に通知する。
+
+**復帰失敗の通知**: スポットキャパシティ枯渇時、ASG は起動を試み続けて延々と立ち上がらない。
+「中断されました」の後に無言で放置されるのを防ぐため、ASG の
+`EC2 Instance Launch Unsuccessful` イベントを EventBridge で拾い
+「復帰に失敗しています（キャパシティ不足）」を通知する（同種イベントの連投は Lambda 側で 10 分抑制）。
+
+### コマンド仕様
+
+| コマンド | 動作 | 応答 |
+|---|---|---|
+| `/pal start` | ASG desired=1 | 「起動中…」→ サーバー側が準備完了時に webhook で「接続先: pal.example.com:8211」 |
+| `/pal stop` | ASG desired=0 → ライフサイクルフック経由で安全停止 | 「セーブして停止中…」→ 完了通知 |
+| `/pal status` | ASG/EC2 状態 + status.json | 状態・接続人数・プレイヤー名・稼働時間・インスタンスタイプ |
+| `/pal players` | status.json | 接続中プレイヤー一覧 |
+| `/pal backup` | SSM RunCommand で即時バックアップ | 完了 or 整合性エラー |
+| `/pal restart` | 安全停止 → 再起動 | |
+
+### EC2 / OS 構成
+
+- **Ubuntu 24.04 LTS x86_64**（AMI ID は SSM パブリックパラメータから取得し、常に最新）
+  - パルワールド専用サーバーは x86 バイナリのみ。Graviton は非対応なので選択肢に入れない
+  - steamcmd は Ubuntu の multiverse にパッケージがあり、AL2023 より確実
+- `palworld` 非 root ユーザーで実行
+- SSH ポートは**開けない**。デバッグは SSM Session Manager 経由
+- セキュリティグループ inbound: UDP 8211 のみ（`0.0.0.0/0`）
+- IMDSv2 必須 / hop limit 1
+- 4GB スワップファイル（16GB でも大人数時の保険）
+
+### 設定ファイルの扱い
+
+`PalWorldSettings.ini` は**セーブに含めず、毎起動 Terraform 変数から生成する**。
+サーバー名・パスワード・経験値倍率などは `extra_pal_settings` 変数で管理し、コード側を正とする。
+バックアップ対象は `Pal/Saved/SaveGames` のみ。設定とワールドデータを分離することで、
+「セーブを戻したら設定も古いものに戻った」という事故を防ぐ。
+
+### 起動時間の短縮
+
+パルワールド本体は約 10GB。毎回 steamcmd でフル取得すると 5〜8 分かかる。
+そこでインストール済みディレクトリを `gamecache/palserver.tar.zst` として S3 に置き、
+起動時は「S3 から復元 → steamcmd で差分パッチのみ適用」とする。
+`appmanifest_2394010.acf` の buildid を S3 の `gamecache/buildid.txt` と比較し、
+変化していたらキャッシュを更新する。
+
+これにより起動は **約 90〜150 秒** に収まる見込み（初回のみキャッシュ生成のため 6〜8 分）。
+
+### アイドル自動停止
+
+`pal-idle.service` が 60 秒ごとに RCON `ShowPlayers` を実行。
+0 人が 15 分連続したら Discord へ通知 → 緊急停止シーケンスと同じ安全停止 → `SetDesiredCapacity 0`。
+起動後 10 分間は判定しない（誰も繋ぐ前に落ちるのを防ぐ）。
+
+---
+
+## 作成するファイル
+
+```
+pal/
+├── DESIGN.md                          この設計書
+├── README.md                          セットアップ手順・運用手順・トラブルシュート
+├── terraform/
+│   ├── versions.tf                    provider 定義
+│   ├── variables.tf                   入力変数
+│   ├── main.tf                        locals / VPC / サブネット / SG / データソース
+│   ├── s3.tf                          バケット・バージョニング・ライフサイクル・スクリプト配置
+│   ├── ssm.tf                         SecureString パラメータ (webhook / admin パスワード)
+│   ├── iam.tf                         インスタンスロール / Lambda ロール
+│   ├── asg.tf                         起動テンプレート / ASG / ライフサイクルフック
+│   ├── lambda.tf                      Lambda / Function URL / EventBridge ルール
+│   ├── outputs.tf                     Interactions Endpoint URL, 接続先ホスト名 等
+│   ├── templates/user_data.sh.tftpl   最小ブートストラップ (S3 からスクリプト取得 → install.sh)
+│   └── terraform.tfvars.example
+├── server/                            S3 経由でインスタンスへ配布されるスクリプト群
+│   ├── install.sh                     steamcmd 導入 / ゲーム復元 / 設定生成 / systemd 登録
+│   ├── lib/common.sh                  共通関数 (S3 パス, ログ, ロック, IMDS 取得)
+│   ├── bin/rcon.py                    Source RCON クライアント (Python 標準ライブラリのみ)
+│   ├── bin/pal-restore.sh             セーブ復元 (検証 + バージョン履歴フォールバック)
+│   ├── bin/pal-backup.sh              整合性チェック付き原子的バックアップ
+│   ├── bin/pal-graceful-stop.sh       緊急/通常停止シーケンス (冪等)
+│   ├── bin/pal-guardian.sh            ★中断監視ループ
+│   ├── bin/pal-idle-watcher.sh        無人検知
+│   ├── bin/pal-status.sh              status.json 発行
+│   ├── bin/pal-notify.sh              Discord webhook 通知
+│   └── systemd/*.service, *.timer
+├── lambda/
+│   ├── index.mjs                      Discord インタラクション + ワーカー + EventBridge 通知
+│   └── package.json
+└── scripts/
+    └── register-commands.mjs          スラッシュコマンドをギルドに登録
+```
+
+---
+
+## コスト試算 (ap-northeast-1)
+
+| 項目 | 単価 | 月額 (1 日 3 時間 = 90h/月 稼働) |
+|---|---|---|
+| EC2 スポット (m6i.xlarge 相当) | 約 $0.07〜0.13/h ※要実測 | **$6.3〜11.7** |
+| EBS gp3 40GB (稼働中のみ) | $0.096/GB月 の日割 | 約 $0.5 |
+| パブリック IPv4 (稼働中のみ) | $0.005/h | $0.45 |
+| S3 (キャッシュ 10GB + 現行セーブ + 48h 版履歴 + 30 日アーカイブ) | $0.025/GB月 | 約 $1.0 |
+| データ転送 (ゲーム UDP 下り。5 人×90h ≈ 10GB と仮定) | $0.114/GB | 約 $1〜3 |
+| Route53 ホストゾーン | $0.50/月 | $0.50 |
+| Lambda / EventBridge / SSM | 無料枠内 | $0 |
+| **合計** | | **約 $10〜17 / 月** |
+
+※ S3 の版履歴を 48h に絞っているのが効いている。5 分間隔の上書きを 30 日分
+バージョン保持すると非現行だけで 160GB 級 (+$4/月) になるため、長期世代は
+1 時間ごとの archive/ に分離した (層 1 参照)。
+
+比較: 同スペックをオンデマンドで常時起動すると **約 $180/月**。
+
+停止中のランニングコストは S3 + Route53 のみで **月 $1 未満**。
+
+> スポット価格は変動する。構築後に
+> `aws ec2 describe-spot-price-history --instance-types m6i.xlarge --product-descriptions Linux/UNIX --region ap-northeast-1`
+> で実勢を確認し、必要なら `instance_types` を安いタイプ中心に調整する。
+
+---
+
+## 構築手順
+
+1. Discord Developer Portal でアプリ作成 → Application ID / Public Key / Bot Token を取得
+2. Discord サーバーに通知用チャンネルを作り Webhook URL を発行
+3. Route53 に対象ドメインのホストゾーンが存在することを確認
+4. `terraform/terraform.tfvars` を作成し上記を記入
+5. `terraform init && terraform apply`
+6. 出力された **Interactions Endpoint URL** を Discord Developer Portal に登録（この時点で Discord が PING を送り、署名検証が通れば保存できる = 疎通確認になる）
+7. `node scripts/register-commands.mjs` でスラッシュコマンドを登録
+8. Discord で `/pal start`（初回はゲーム本体ダウンロードのため 6〜8 分）
+
+## 検証手順
+
+| # | 検証項目 | 方法 | 期待結果 |
+|---|---|---|---|
+| 1 | Terraform 構文 | `terraform validate` / `terraform plan` | エラーなし |
+| 2 | 署名検証 | Discord Portal で Endpoint URL を保存 | 保存が成功する（失敗＝検証不備） |
+| 3 | 起動 | `/pal start` | 90〜150 秒後に Discord へ接続先が通知され、ゲームから接続できる |
+| 4 | DNS | `nslookup pal.example.com` | インスタンスの Public IP を返す |
+| 5 | 定期バックアップ | 5 分待って `aws s3 ls s3://<bucket>/saves/` | latest.tar.zst の更新時刻が進む |
+| 6 | 通常停止 | `/pal stop` | セーブ後に停止。再起動して進行が残っているか確認 |
+| 7 | **スポット中断ドリル** | AWS FIS の `aws:ec2:send-spot-instance-interruptions` アクションで実験を実行 | Discord に警告 → セーブ完了通知 → 自動で別インスタンス起動 → 進行がロストしていない |
+| 8 | 破損検知 | `Level.sav` を 0 バイトに truncate してバックアップ実行 | latest が更新されず quarantine へ入り、Discord に警告 |
+| 9 | アイドル停止 | 誰も繋がずに 25 分放置 | 自動でセーブして停止 |
+| 10 | 復元フォールバック | latest.tar.zst にゴミを上書きして起動 | 1 つ前のバージョンから復元されて起動する |
+| 11 | **停止中の起動レース** | `/pal stop` 直後 (5 秒以内) に `/pal start` | Lambda が拒否。強行しても新インスタンスがロック解放を待ち、旧側の最終セーブを復元する |
+| 12 | 初回起動 | S3 が空の状態で `/pal start` | 新規ワールドで起動し、初回バックアップが緩和モードで成功する |
+
+**7 番が本システムの合否を決める最重要テスト**。ここが通らなければ設計の見直しが必要。
+
+---
+
+## 既知のリスク・制約
+
+| リスク | 影響 | 対処 |
+|---|---|---|
+| スポットキャパシティ枯渇 | `/pal start` しても起動しない | 11 タイプ × 全 AZ に分散。それでも駄目な場合に備え、README にオンデマンドへ一時切替する手順を記載 |
+| 中断が 2 分未満で強制回収される稀なケース | 最大 5 分ロスト | 層 1 の定期バックアップが最終防衛線 |
+| セーブ肥大化 (長期運用で Level.sav が 1GB 超) | 緊急セーブが 2 分に収まらなくなる | status.json にセーブサイズを載せ、閾値超過で Discord 警告。必要ならバックアップ間隔短縮 |
+| Palworld アップデートで RCON 仕様変更 | 安全停止が機能しなくなる | RCON 失敗時は SIGTERM → プロセス終了待ち → ファイル退避のフォールバック経路を実装 |
+| Discord Webhook URL の漏洩 | 通知チャンネルへの荒らし | SSM SecureString に格納。Terraform state にも入るため state はローカル or 暗号化 S3 に置く |
+| 同時に `/pal start` が連打される | 特になし（ASG が冪等） | Lambda 側で現在の状態を見て「すでに起動中です」と返す |
+| 停止処理中に `/pal start` | 世代逆転で直前の進行が静かに消える | Lambda 拒否 + S3 ロック（排他制御の節）で二重に防止 |
+| インスタンスロールの Route53 権限 | `ChangeResourceRecordSets` は**ゾーン単位**。サーバーが乗っ取られると同一ゾーンの全レコードを書き換えられる | 他用途と共有するゾーンなら、ゲーム専用のサブドメインゾーンに分離する (+$0.50/月)。README に注意を記載 |
+
+---
+
+## 決定事項（設計時に未確定だったもの）
+
+- **Steam クエリポート 27015/udp**: デフォルト閉じる。`enable_steam_query_port = true` で開放可能
+- **Terraform state のバックエンド**: デフォルトはローカル。チーム運用なら S3 + DynamoDB へ変更する（README に手順）
+- **CloudWatch Logs へのログ常時転送**: 行わない。停止時に `logs/` へ S3 退避 + 稼働中は SSM Session Manager で `journalctl` を見る
+- **セーブの置き場所**: S3（EFS / EBS との比較は「設計判断」の節）
+- **latest のバージョン履歴**: 48 時間 + 直近 10 世代。長期世代は 1 時間ごとの archive/ (30 日)
+- **DNS TTL**: 60 秒（復帰時の再接続を成立させるための必須条件）
+- **排他制御**: S3 ロック `lock/active.json`。Lambda 側の起動拒否は補助
+- **Lambda の保護**: Function URL は署名検証 + 予約済み同時実行数 5 で頭打ち

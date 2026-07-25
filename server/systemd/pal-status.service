@@ -1,0 +1,6 @@
+[Unit]
+Description=Publish Palworld status.json to S3
+
+[Service]
+Type=oneshot
+ExecStart=/opt/palworld/bin/pal-status.sh running
