@@ -181,6 +181,12 @@ S3 のバージョン履歴を新しい順に辿り、最初に検証を通っ�
 `saves/latest.tar.zst` 自体が存在しない場合は**初回起動**とみなし、新規ワールドとして起動する
 （`archive/` や quarantine が存在するのに latest だけ無い場合は異常なので、起動を中断して Discord に警告）。
 
+**ワールド選択の引き継ぎ (実運用で踏んだ罠)**: Palworld は「どのワールドを開くか」を
+`GameUserSettings.ini` の `DedicatedServerName` で覚えており、このファイルは SaveGames の
+**外**にある。復元だけしてこれを書かないと、サーバーは復元済みワールドを無視して新規
+ワールドを作る（= プレイヤーはキャラクリからやり直しに見える）。restore は復元後、
+Level.sav が最新のワールドディレクトリを `DedicatedServerName` に書き込む。
+
 ### 中断されたあとの自動復帰
 
 ASG の `CapacityRebalance = true` + `max_size = 1` の組み合わせにより、

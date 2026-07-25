@@ -46,6 +46,22 @@ install_save() {
   mv "$EXTRACT" "$SAVE_DIR"
   chown -R palworld:palworld "$SAVE_DIR"
   log "save restored into $SAVE_DIR"
+
+  # どのワールドを開くかは GameUserSettings.ini の DedicatedServerName が決める。
+  # このファイルはバックアップ対象外 (SaveGames の外) のため、書かないと
+  # サーバーは復元したワールドを無視して新規ワールドを作ってしまう。
+  # 複数ワールドが残っている場合は Level.sav が最新のもの = 直前まで稼働していたものを選ぶ。
+  local newest conf_dir
+  newest=$(find "$SAVE_DIR" -mindepth 3 -maxdepth 3 -name Level.sav -printf '%T@ %h\n' 2>/dev/null \
+    | sort -rn | head -n 1 | awk '{print $2}' | xargs -r basename)
+  if [ -n "$newest" ]; then
+    conf_dir="$PAL_DIR/Pal/Saved/Config/LinuxServer"
+    mkdir -p "$conf_dir"
+    printf '[/Script/Pal.PalGameLocalSettings]\nDedicatedServerName=%s\n' "$newest" \
+      > "$conf_dir/GameUserSettings.ini"
+    chown -R palworld:palworld "$PAL_DIR/Pal/Saved/Config"
+    log "world selected: $newest"
+  fi
 }
 
 # --- 1. 現行の latest ------------------------------------------------------
