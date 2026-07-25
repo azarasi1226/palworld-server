@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # 安全停止シーケンス (DESIGN.md 層 3)。緊急 (スポット中断) と通常 (stop/idle) で共用。
 #
-#   pal-graceful-stop.sh spot|rebalance|lifecycle|idle|manual
+#   pal-graceful-stop.sh spot|lifecycle|idle|manual
 #
 # 冪等: guardian の複数シグナルや二重起動があっても 1 回しか走らない。
 source /opt/palworld/lib/common.sh
@@ -23,7 +23,6 @@ log "graceful stop start (reason=$REASON)"
 
 case "$REASON" in
   spot)      notify "⚠️ スポット中断の警告を受信しました" "約 2 分後に強制終了されます。セーブして退避します。切断される可能性があります。" yellow ;;
-  rebalance) notify "⚠️ スポット中断の予兆を検知しました" "先回りしてセーブ・退避します。数分後に別のサーバーで復帰します。" yellow ;;
   idle)      notify "💤 無人のため自動停止します" "${PAL_IDLE_MINUTES} 分間接続がありませんでした。セーブして停止します。" blue ;;
   lifecycle) notify "🛑 停止要求を受信しました" "セーブして停止します。" blue ;;
   *)         notify "🛑 停止します" "セーブして停止します。" blue ;;
@@ -82,7 +81,7 @@ fi
 ELAPSED=$(( $(date +%s) - START_EPOCH ))
 if [ "$BACKUP_OK" = "1" ]; then
   case "$REASON" in
-    spot|rebalance)
+    spot)
       notify "✅ 緊急セーブ完了 (${ELAPSED} 秒)" "ロスト: 0 分\n別のサーバーで自動復帰します。数分後に再接続してください。\n接続先: $PAL_FQDN:$PAL_GAME_PORT" green ;;
     *)
       notify "✅ セーブして停止しました (${ELAPSED} 秒)" "再開するには /pal start を実行してください。" green ;;

@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
-# ★中断検知の心臓部 (DESIGN.md 層 2)。5 秒間隔で 3 系統のシグナルを監視し、
-# どれか 1 つでも立ったら即座に安全停止シーケンスへ入る。
+# ★中断検知の心臓部 (DESIGN.md 層 2)。5 秒間隔で 2 系統のシグナルを監視し、
+# どちらかが立ったら即座に安全停止シーケンスへ入る。
 #
-#   1. Spot 中断通知      IMDS spot/instance-action           (猶予 約 2 分)
-#   2. リバランス推奨     IMDS events/recommendations/rebalance (中断通知より早い)
-#   3. ASG ライフサイクル Terminating:Wait                     (猶予 300 秒)
+#   1. Spot 中断通知      IMDS spot/instance-action  (猶予 約 2 分)
+#   2. ASG ライフサイクル Terminating:Wait           (猶予 300 秒)
+#
+# リバランス推奨 (中断の予兆) は自前監視しない。ASG CapacityRebalance が
+# 置換を始め、旧側の終了は 2 のライフサイクル経路を通るため安全停止は保証される。
 source /opt/palworld/lib/common.sh
 
 IID=$(instance_id)
@@ -21,12 +23,6 @@ while true; do
     if imds_get "meta-data/spot/instance-action" >/dev/null; then
       log "SIGNAL: spot interruption notice"
       /opt/palworld/bin/pal-graceful-stop.sh spot || true
-    fi
-
-    # --- 2. リバランス推奨 -------------------------------------------------
-    if imds_get "meta-data/events/recommendations/rebalance" >/dev/null; then
-      log "SIGNAL: rebalance recommendation"
-      /opt/palworld/bin/pal-graceful-stop.sh rebalance || true
     fi
   fi
 
