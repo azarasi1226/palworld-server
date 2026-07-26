@@ -62,6 +62,17 @@ resource "aws_launch_template" "server" {
     }
   }
 
+  # ボリュームにもタグを伝播させる。これが無いと EBS の費用がコスト集計で
+  # プロジェクトに紐づかず、孤児ボリュームの特定もできない。
+  tag_specifications {
+    resource_type = "volume"
+
+    tags = {
+      Name    = "${local.name}-server"
+      Project = var.project_name
+    }
+  }
+
   # AMI (SSM パラメータ) の更新だけでテンプレートの差分が出続けるのを防ぐ。
   lifecycle {
     ignore_changes = [image_id]

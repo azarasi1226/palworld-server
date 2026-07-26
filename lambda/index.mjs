@@ -272,6 +272,32 @@ async function doStatus() {
         const b = Math.floor((Date.now() / 1000 - st.last_backup_epoch) / 60);
         lines.push(`最終バックアップ: ${b} 分前`);
       }
+
+      // リソース使用状況。メモリとディスクは CloudWatch では取得できないため
+      // インスタンス側が status.json に載せている (エージェント不要 = 追加コスト無し)。
+      const res = [];
+      if (st.mem_total_mb) {
+        const pct = Math.round((st.mem_used_mb / st.mem_total_mb) * 100);
+        const gb = (mb) => (mb / 1024).toFixed(1);
+        let mem = `メモリ: ${gb(st.mem_used_mb)} / ${gb(st.mem_total_mb)} GB (${pct}%)`;
+        if (pct >= 90) mem = `⚠️ ${mem} — 逼迫しています`;
+        res.push(mem);
+        // Linux は空きがあってもアイドルページを退避するため数百 MB は正常。
+        // 1GB を超えたら物理メモリ不足を疑うレベル。
+        if (st.swap_used_mb > 1024) {
+          res.push(`⚠️ スワップ ${gb(st.swap_used_mb)} GB 使用 — メモリ不足の兆候です`);
+        }
+      }
+      if (st.cpu_cores) {
+        res.push(`CPU: ${st.cpu_percent}% (${st.cpu_cores} コア / load ${st.load1})`);
+      }
+      if (st.disk_total_gb) {
+        const pct = Math.round((st.disk_used_gb / st.disk_total_gb) * 100);
+        let disk = `ディスク: ${st.disk_used_gb} / ${st.disk_total_gb} GB (${pct}%)`;
+        if (pct >= 85) disk = `⚠️ ${disk} — 空き容量が不足しています`;
+        res.push(disk);
+      }
+      if (res.length) lines.push("", ...res);
     }
   }
   return lines.join("\n");
