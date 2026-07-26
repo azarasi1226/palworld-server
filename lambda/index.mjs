@@ -205,13 +205,17 @@ async function doStop() {
 }
 
 async function doRestart() {
-  const stopMsg = await doStop();
-  if (stopMsg.startsWith("ℹ️")) {
-    // 停止済みならそのまま起動へ。
+  // 停止済みなら単に起動する。doStop() の戻り文言で判定すると
+  // 文言を変えた瞬間に壊れるため、状態そのものを見る。
+  const before = await getAsg();
+  if (before.DesiredCapacity === 0 && before.Instances.length === 0) {
     return await doStart();
   }
-  // 旧インスタンスの消滅を待ってから desired=1 に戻す (最大 ~100 秒)。
+  await doStop();
+  // 旧インスタンスの消滅を待ってから desired=1 に戻す。
   // 待ちきれなくても S3 ロックが正しさを守るので、起動要求だけ出して返す。
+  // 注意: ここで待たずに desired=1 に戻すと、停止側が原因判定に使う desired が
+  // 1 になり「ユーザー操作」ではなく「AWS 都合の置き換え」と誤報する。
   for (let i = 0; i < 20; i++) {
     await sleep(5000);
     const g = await getAsg();
@@ -478,33 +482,28 @@ async function fetchCostExplorer() {
     const start = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}-01`;
     const end = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
 
-    // DAILY で 1 回だけ取得し、合計・内訳・日数をすべてここから計算する
-    // (API コールを 1 回に抑えるため)
+    // 日別の推移は Discord では出さないので MONTHLY で足りる
+    // (API コールも 1 回に抑えられる)。日別グラフが要るときは scripts/cost.sh を使う。
     const res = await client.send(
       new mod.GetCostAndUsageCommand({
         TimePeriod: { Start: start, End: end },
-        Granularity: "DAILY",
+        Granularity: "MONTHLY",
         Metrics: ["UnblendedCost"],
         GroupBy: [{ Type: "DIMENSION", Key: "SERVICE" }],
       }),
     );
 
     const byService = {};
-    const days = [];
     for (const p of res.ResultsByTime ?? []) {
-      let dayTotal = 0;
       for (const grp of p.Groups ?? []) {
-        const amt = parseFloat(grp.Metrics.UnblendedCost.Amount);
-        byService[grp.Keys[0]] = (byService[grp.Keys[0]] ?? 0) + amt;
-        dayTotal += amt;
+        byService[grp.Keys[0]] =
+          (byService[grp.Keys[0]] ?? 0) + parseFloat(grp.Metrics.UnblendedCost.Amount);
       }
-      days.push(dayTotal);
     }
     return {
       fetched_epoch: Math.floor(Date.now() / 1000),
       month_start: start,
       by_service: byService,
-      days,
     };
   } catch (e) {
     console.error("cost explorer query failed", e);

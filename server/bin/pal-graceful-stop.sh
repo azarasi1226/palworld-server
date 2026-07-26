@@ -90,10 +90,11 @@ lock_release
 
 # --- ASG への後始末 ---------------------------------------------------------
 IID=$(instance_id)
-ASG_INFO=$($AWS autoscaling describe-auto-scaling-instances --instance-ids "$IID" \
-  --query "AutoScalingInstances[0]" --output json 2>/dev/null || echo "{}")
-ASG_NAME=$(echo "$ASG_INFO" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("AutoScalingGroupName",""))' 2>/dev/null || true)
-LC_STATE=$(echo "$ASG_INFO" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("LifecycleState",""))' 2>/dev/null || true)
+# --query で 2 値まとめて取り出す (python プロセスを挟まない。緊急停止は 2 分制限)
+read -r ASG_NAME LC_STATE <<< "$($AWS autoscaling describe-auto-scaling-instances \
+  --instance-ids "$IID" \
+  --query "AutoScalingInstances[0].[AutoScalingGroupName,LifecycleState]" \
+  --output text 2>/dev/null || echo "")"
 
 if [ "$LC_STATE" = "Terminating:Wait" ]; then
   # ライフサイクルフックを解放して終了を進めさせる。

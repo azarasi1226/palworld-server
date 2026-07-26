@@ -98,25 +98,26 @@ lock_write() {
 lock_release() {
   # 自分のロックの場合のみ消す (後続インスタンスのロックを消してしまわないように)。
   local owner
-  owner=$($AWS s3 cp "$S3/lock/active.json" - 2>/dev/null | python3 -c \
-    'import json,sys; print(json.load(sys.stdin).get("instance_id",""))' 2>/dev/null || true)
+  owner=$(lock_field instance_id)
   if [ "$owner" = "$(instance_id)" ]; then
     $AWS s3 rm "$S3/lock/active.json" >/dev/null 2>&1 || true
   fi
 }
 
+# lock/active.json から 1 項目を取り出す。存在しなければ空文字。
+lock_field() {
+  $AWS s3 cp "$S3/lock/active.json" - 2>/dev/null \
+    | python3 -c "import json,sys; print(json.load(sys.stdin).get('$1',''))" 2>/dev/null || true
+}
+
 # 前任インスタンスのロックが消えるか陳腐化 (90 秒無更新 = 突然死) するまで待つ。
 # 復元より前に必ず呼ぶこと。
 lock_wait() {
-  local body hb age now
+  local hb age now
   while true; do
-    body=$($AWS s3 cp "$S3/lock/active.json" - 2>/dev/null || true)
-    [ -z "$body" ] && return 0 # ロック無し
-
-    hb=$(echo "$body" | python3 -c \
-      'import json,sys; print(json.load(sys.stdin).get("heartbeat",""))' 2>/dev/null || true)
+    hb=$(lock_field heartbeat)
     if [ -z "$hb" ]; then
-      log "lock: broken lock file, ignoring"
+      # ロックが無い / 壊れている。どちらも待つ理由がない。
       return 0
     fi
 
