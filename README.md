@@ -164,6 +164,7 @@ Discord で:
 | `/pal status` | 状態・接続人数・稼働時間・最終バックアップ |
 | `/pal players` | 接続中のプレイヤー一覧 |
 | `/pal backup` | 今すぐバックアップ |
+| `/pal cost` | 今月の AWS 料金と、現在の時間単価 |
 
 **基本的に消し忘れの心配は不要です。** 15 分間誰も接続していなければ自動でセーブして
 停止します（`idle_shutdown_minutes` で変更、`0` で無効化）。
@@ -239,12 +240,25 @@ S3 バケットは誤削除防止（`prevent_destroy`）で失敗します。セ
 | 停止中 | 月 $1 未満（S3 + Route53 のみ） |
 | 90 時間/月 遊んだ場合 | **約 $10〜17/月** |
 
-現在のスポット相場の確認:
+### 実際にいくらかかっているか見る
+
+**Discord から**: `/pal cost`
+
+**ターミナルから**（日別推移のグラフ付き）:
 
 ```bash
-aws ec2 describe-spot-price-history --instance-types m6i.xlarge \
-  --product-descriptions Linux/UNIX --max-items 5 --region ap-northeast-1
+AWS_PROFILE=prod_admin bash scripts/cost.sh
 ```
+
+2 つの視点を並べて表示します:
+
+- **今月の実績** — 合計・サービス別内訳・日別推移・着地予測（Cost Explorer 由来。反映が半日〜1 日遅れます）
+- **今この瞬間** — 稼働中インスタンスの時間単価（スポット実勢価格 + EBS + IPv4）と、そのセッションでここまでいくら使ったか（遅延なし）
+
+サーバー停止中に実行すると「EC2 の課金は発生していません」と表示されます。
+
+> Cost Explorer は **1 リクエスト $0.01 の有料 API** です。スクリプトは 1 回の実行につき
+> 1 コールに抑えていますが、毎日叩くと月 $0.3 になります。気になる場合は週 1 回程度に。
 
 ---
 

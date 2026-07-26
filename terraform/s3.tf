@@ -108,6 +108,35 @@ resource "aws_s3_bucket_lifecycle_configuration" "state" {
     }
   }
 
+  # status.json は 30 秒ごとに上書きされるため旧版が無限に溜まる。履歴に価値はない。
+  # 注意: prefix を空にすると saves/ にも被り、48h のロールバック窓を潰す恐れがある。
+  # そのため対象キーを明示したルールに分ける。
+  rule {
+    id     = "expire-status-versions"
+    status = "Enabled"
+
+    filter {
+      prefix = "status.json"
+    }
+
+    noncurrent_version_expiration {
+      noncurrent_days = 1
+    }
+  }
+
+  rule {
+    id     = "expire-cost-cache-versions"
+    status = "Enabled"
+
+    filter {
+      prefix = "cost-cache.json"
+    }
+
+    noncurrent_version_expiration {
+      noncurrent_days = 1
+    }
+  }
+
   rule {
     id     = "abort-incomplete-uploads"
     status = "Enabled"

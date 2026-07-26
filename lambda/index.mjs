@@ -10,8 +10,12 @@ import {
   DescribeAutoScalingGroupsCommand,
   SetDesiredCapacityCommand,
 } from "@aws-sdk/client-auto-scaling";
-import { EC2Client, DescribeInstancesCommand } from "@aws-sdk/client-ec2";
-import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
+import {
+  EC2Client,
+  DescribeInstancesCommand,
+  DescribeSpotPriceHistoryCommand,
+} from "@aws-sdk/client-ec2";
+import { S3Client, GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import {
   SSMClient,
   GetParameterCommand,
@@ -132,6 +136,7 @@ async function runWorker({ action, token }) {
       case "status":  content = await doStatus(); break;
       case "players": content = await doPlayers(); break;
       case "backup":  content = await doBackup(); break;
+      case "cost":    content = await doCost(); break;
       default:        content = `未知のコマンドです: ${action}`;
     }
   } catch (e) {
@@ -311,6 +316,211 @@ async function findRunningInstance() {
   const g = await getAsg();
   const inst = g.Instances.find((i) => i.LifecycleState === "InService");
   return inst?.InstanceId ?? null;
+}
+
+// ---------------------------------------------------------------------------
+// コストレポート
+//   [A] 今月の実績 (Cost Explorer) ... 正確だが反映が半日〜1日遅れる
+//   [B] 今この瞬間 (EC2 API)       ... 遅延なし。時間単価と当セッション分
+// ---------------------------------------------------------------------------
+
+const COST_CACHE_KEY = "cost-cache.json";
+const COST_CACHE_TTL = 3600; // 秒
+
+// --- 為替 -------------------------------------------------------------------
+// 外部 API (ECB ベース・キー不要) から取得するが、落ちても壊れないよう
+// フォールバック定数を持つ。キャッシュは warm コンテナ内のメモリのみ =
+// S3 も IAM も増やさない。ECB のレートは 1 日 1 回更新なので TTL は 24h。
+const FX_URL = "https://api.frankfurter.dev/v1/latest?from=USD&to=JPY";
+const FX_FALLBACK = 163; // 取得失敗時の概算値 (2026-07 時点の目安)
+const FX_TTL = 86400;
+let fxCache = { rate: null, epoch: 0 };
+
+async function getUsdJpy() {
+  const now = Math.floor(Date.now() / 1000);
+  if (fxCache.rate && now - fxCache.epoch < FX_TTL) {
+    return { rate: fxCache.rate, exact: true };
+  }
+  try {
+    const res = await fetch(FX_URL, { signal: AbortSignal.timeout(3000) });
+    const rate = (await res.json())?.rates?.JPY;
+    if (typeof rate === "number" && rate > 0) {
+      fxCache = { rate, epoch: now };
+      return { rate, exact: true };
+    }
+  } catch (e) {
+    console.error("fx fetch failed", e);
+  }
+  return { rate: FX_FALLBACK, exact: false }; // 概算表示にフォールバック
+}
+
+const yen = (usd, rate) => "¥" + Math.round(usd * rate).toLocaleString("ja-JP");
+
+async function doCost() {
+  const out = ["📊 **コストレポート**", ""];
+  const fx = await getUsdJpy();
+
+  // --- [A] 実績 -------------------------------------------------------------
+  // Cost Explorer は 1 リクエスト $0.01 の有料 API。誰が何回叩いても
+  // 1 時間に 1 回しか実際には課金されないよう S3 にキャッシュする。
+  let ce = null;
+  let ageMin = 0;
+  try {
+    const r = await s3.send(new GetObjectCommand({ Bucket: BUCKET, Key: COST_CACHE_KEY }));
+    const cached = JSON.parse(await r.Body.transformToString());
+    const age = Math.floor(Date.now() / 1000) - cached.fetched_epoch;
+    if (age < COST_CACHE_TTL) {
+      ce = cached;
+      ageMin = Math.floor(age / 60);
+    }
+  } catch {
+    // キャッシュ無し
+  }
+
+  if (!ce) {
+    ce = await fetchCostExplorer();
+    if (ce) {
+      await s3.send(
+        new PutObjectCommand({
+          Bucket: BUCKET,
+          Key: COST_CACHE_KEY,
+          Body: JSON.stringify(ce),
+          ContentType: "application/json",
+        }),
+      );
+    }
+  }
+
+  if (ce) {
+    const total = Object.values(ce.by_service).reduce((a, b) => a + b, 0);
+    const freshness = ageMin > 0 ? `${ageMin} 分前の取得` : "たった今取得";
+    out.push(`**今月の実績** (${ce.month_start} 〜 / ${freshness})`);
+    out.push("```");
+    for (const [name, amt] of Object.entries(ce.by_service).sort((a, b) => b[1] - a[1])) {
+      if (amt < 0.005) continue;
+      out.push(`  ${shortServiceName(name)}: ${yen(amt, fx.rate)}`);
+    }
+    out.push("  ─────────────────");
+    out.push(`  合計: ${yen(total, fx.rate)}  ($${total.toFixed(2)})`);
+    out.push("```");
+    out.push("※ Cost Explorer は反映が半日〜1 日遅れます");
+  } else {
+    out.push("**今月の実績**: 取得できませんでした");
+    out.push("（Cost Explorer が未有効か、Lambda にモジュールが同梱されていません。README のトラブルシュート参照）");
+  }
+
+  // --- [B] 今この瞬間 -------------------------------------------------------
+  out.push("");
+  out.push("**今この瞬間**");
+  const g = await getAsg();
+  const inst = g.Instances.find((i) => i.LifecycleState === "InService");
+
+  if (!inst) {
+    out.push("💤 停止中 — EC2 の課金は発生していません");
+    out.push("（停止中の負担は S3 と Route 53 のみ = 月 $1 未満）");
+  } else {
+    const d = await ec2.send(new DescribeInstancesCommand({ InstanceIds: [inst.InstanceId] }));
+    const i = d.Reservations[0].Instances[0];
+
+    let spot = 0;
+    try {
+      const sp = await ec2.send(
+        new DescribeSpotPriceHistoryCommand({
+          InstanceTypes: [i.InstanceType],
+          ProductDescriptions: ["Linux/UNIX"],
+          AvailabilityZone: i.Placement.AvailabilityZone,
+          MaxResults: 1,
+        }),
+      );
+      spot = parseFloat(sp.SpotPriceHistory?.[0]?.SpotPrice ?? "0");
+    } catch {
+      // 価格が引けなくても稼働情報は出す
+    }
+
+    const ebsIp = (0.096 * 40) / 730 + 0.005; // gp3 40GB の時間割 + パブリック IPv4
+    const hourly = spot + ebsIp;
+    const upH = (Date.now() - new Date(i.LaunchTime).getTime()) / 3600000;
+
+    out.push(`🎮 稼働中: ${i.InstanceType} (${i.Placement.AvailabilityZone})`);
+    out.push("```");
+    out.push(`  スポット価格: ${yen(spot, fx.rate)}/時`);
+    out.push(`  EBS + IPv4:   ${yen(ebsIp, fx.rate)}/時`);
+    out.push("  ─────────────────");
+    out.push(`  合計: ${yen(hourly, fx.rate)}/時  ($${hourly.toFixed(4)})`);
+    out.push("```");
+    out.push(`稼働時間: ${Math.floor(upH)}時間${Math.floor((upH % 1) * 60)}分`);
+  }
+
+  out.push("");
+  out.push(
+    fx.exact
+      ? `_参考為替: $1 = ¥${fx.rate.toFixed(1)}_`
+      : `_参考為替: $1 = ¥${fx.rate}（レート取得に失敗したため概算）_`,
+  );
+
+  return out.join("\n");
+}
+
+async function fetchCostExplorer() {
+  // Cost Explorer クライアントがランタイムに同梱されているか保証がないため
+  // 動的 import する。読めなくても他のコマンドは壊さない。
+  let mod;
+  try {
+    mod = await import("@aws-sdk/client-cost-explorer");
+  } catch (e) {
+    console.error("cost-explorer module unavailable", e);
+    return null;
+  }
+
+  try {
+    const client = new mod.CostExplorerClient({ region: "us-east-1" }); // CE はグローバル
+    const now = new Date();
+    const start = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}-01`;
+    const end = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+
+    // DAILY で 1 回だけ取得し、合計・内訳・日数をすべてここから計算する
+    // (API コールを 1 回に抑えるため)
+    const res = await client.send(
+      new mod.GetCostAndUsageCommand({
+        TimePeriod: { Start: start, End: end },
+        Granularity: "DAILY",
+        Metrics: ["UnblendedCost"],
+        GroupBy: [{ Type: "DIMENSION", Key: "SERVICE" }],
+      }),
+    );
+
+    const byService = {};
+    const days = [];
+    for (const p of res.ResultsByTime ?? []) {
+      let dayTotal = 0;
+      for (const grp of p.Groups ?? []) {
+        const amt = parseFloat(grp.Metrics.UnblendedCost.Amount);
+        byService[grp.Keys[0]] = (byService[grp.Keys[0]] ?? 0) + amt;
+        dayTotal += amt;
+      }
+      days.push(dayTotal);
+    }
+    return {
+      fetched_epoch: Math.floor(Date.now() / 1000),
+      month_start: start,
+      by_service: byService,
+      days,
+    };
+  } catch (e) {
+    console.error("cost explorer query failed", e);
+    return null;
+  }
+}
+
+function shortServiceName(name) {
+  return name
+    .replace("Amazon Elastic Compute Cloud - Compute", "EC2 (インスタンス)")
+    .replace("EC2 - Other", "EC2 (EBS/IP など)")
+    .replace("Amazon Simple Storage Service", "S3")
+    .replace("Amazon Route 53", "Route 53")
+    .replace("AWS Cost Explorer", "Cost Explorer API")
+    .replace("AWS Key Management Service", "KMS")
+    .replace("AWS Systems Manager", "SSM");
 }
 
 // ---------------------------------------------------------------------------

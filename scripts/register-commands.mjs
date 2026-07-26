@@ -28,6 +28,7 @@ const commands = [
       SUB("status", "サーバーの状態と接続人数を表示する"),
       SUB("players", "接続中のプレイヤー一覧を表示する"),
       SUB("backup", "今すぐバックアップを実行する"),
+      SUB("cost", "今月かかっている AWS 料金を表示する"),
     ],
   },
 ];

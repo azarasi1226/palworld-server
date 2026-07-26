@@ -146,11 +146,13 @@ data "aws_iam_policy_document" "lambda" {
   }
 
   # Describe 系はリソースレベル制限不可。
+  # DescribeSpotPriceHistory は /pal cost の「現在の時間単価」算出に使う。
   statement {
     sid = "Describe"
     actions = [
       "autoscaling:DescribeAutoScalingGroups",
       "ec2:DescribeInstances",
+      "ec2:DescribeSpotPriceHistory",
     ]
     resources = ["*"]
   }
@@ -160,6 +162,20 @@ data "aws_iam_policy_document" "lambda" {
     sid       = "ReadStatus"
     actions   = ["s3:GetObject"]
     resources = ["${aws_s3_bucket.state.arn}/status.json"]
+  }
+
+  # /pal cost: Cost Explorer は 1 リクエスト $0.01 の有料 API のため、
+  # 結果を S3 に 1 時間キャッシュして連打しても課金が増えないようにする。
+  statement {
+    sid       = "CostExplorer"
+    actions   = ["ce:GetCostAndUsage"]
+    resources = ["*"] # CE はリソースレベル制限に非対応
+  }
+
+  statement {
+    sid       = "CostCache"
+    actions   = ["s3:GetObject", "s3:PutObject"]
+    resources = ["${aws_s3_bucket.state.arn}/cost-cache.json"]
   }
 
   # /pal backup: インスタンス上で即時バックアップを実行する。
