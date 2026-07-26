@@ -19,18 +19,44 @@ if [ -f "$STATE_DIR/stopped" ]; then
 fi
 
 START_EPOCH=$(date +%s)
-log "graceful stop start (reason=$REASON)"
+
+# --- 停止原因の分類 ----------------------------------------------------------
+# lifecycle (ASG からの終了指示) は「ユーザーの /pal stop」と「スポット起因の
+# 置き換え」の両方で発生するため、通知が区別できるよう原因を判定する。
+#   1. IMDS にスポット回収の警告/予兆が出ている -> スポット起因
+#   2. ASG の desired が 0                       -> ユーザーの停止操作
+#   3. desired が 1 のままの置き換え             -> AWS 都合 (ヘルスチェック等)
+CAUSE="$REASON"
+if [ "$REASON" = "lifecycle" ]; then
+  if imds_get "meta-data/spot/instance-action" >/dev/null \
+     || imds_get "meta-data/events/recommendations/rebalance" >/dev/null; then
+    CAUSE="spot_replace"
+  else
+    DESIRED=$($AWS autoscaling describe-auto-scaling-groups \
+      --auto-scaling-group-names "$PAL_PROJECT-server" \
+      --query "AutoScalingGroups[0].DesiredCapacity" --output text 2>/dev/null || echo "?")
+    case "$DESIRED" in
+      0) CAUSE="user_stop" ;;
+      "?") CAUSE="lifecycle" ;; # 判定失敗時は従来どおりの汎用文言に落とす
+      *) CAUSE="replace_other" ;;
+    esac
+  fi
+fi
+log "graceful stop start (reason=$REASON, cause=$CAUSE)"
 
 # 定期タイマーを先に止める。放置すると停止後に status タイマーが
 # ロックを再作成し、次のインスタンスが陳腐化判定の 90 秒を無駄に待つ。
 # (pal-idle / pal-guardian は本スクリプトの呼び出し元になりうるため止めない)
 systemctl stop pal-backup.timer pal-status.timer 2>/dev/null || true
 
-case "$REASON" in
-  spot)      notify "⚠️ スポット中断の警告を受信しました" "約 2 分後に強制終了されます。セーブして退避します。切断される可能性があります。" yellow ;;
-  idle)      notify "💤 無人のため自動停止します" "${PAL_IDLE_MINUTES} 分間接続がありませんでした。セーブして停止します。" blue ;;
-  lifecycle) notify "🛑 停止要求を受信しました" "セーブして停止します。" blue ;;
-  *)         notify "🛑 停止します" "セーブして停止します。" blue ;;
+case "$CAUSE" in
+  spot)          notify "⚠️ スポット中断の警告を受信しました" "【原因: AWS によるスポット回収】\n約 2 分後に強制終了されます。セーブして退避します。\n数分後に別のサーバーで自動復帰します。" yellow ;;
+  spot_replace)  notify "⚠️ スポット回収のためサーバーを自動移行します" "【原因: AWS によるスポット回収の予兆】\n誰かが停止したわけではありません。セーブして別のサーバーへ引っ越します。\n数分後に同じアドレスで再接続できます。" yellow ;;
+  replace_other) notify "🔁 AWS がサーバーを置き換えています" "【原因: AWS 側の自動メンテナンス (ヘルスチェック等)】\nセーブして退避します。数分後に再接続できます。" yellow ;;
+  user_stop)     notify "🛑 停止要求を受け付けました" "【原因: ユーザー操作 (/pal stop・restart または管理操作)】\nセーブして停止します。" blue ;;
+  idle)          notify "💤 無人のため自動停止します" "【原因: ${PAL_IDLE_MINUTES} 分間接続なし (消し忘れ防止)】\nセーブして停止します。再開は /pal start で。" blue ;;
+  lifecycle)     notify "🛑 停止要求を受信しました" "セーブして停止します。" blue ;;
+  *)             notify "🛑 停止します" "【原因: サーバー上での手動実行】\nセーブして停止します。" blue ;;
 esac
 
 rcon_broadcast "SERVER_SAVING_AND_SHUTTING_DOWN"
@@ -86,8 +112,8 @@ fi
 # --- 結果通知 (ロスト見込みの明示) ------------------------------------------
 ELAPSED=$(( $(date +%s) - START_EPOCH ))
 if [ "$BACKUP_OK" = "1" ]; then
-  case "$REASON" in
-    spot)
+  case "$CAUSE" in
+    spot|spot_replace|replace_other)
       notify "✅ 緊急セーブ完了 (${ELAPSED} 秒)" "ロスト: 0 分\n別のサーバーで自動復帰します。数分後に再接続してください。\n接続先: $PAL_FQDN:$PAL_GAME_PORT" green ;;
     *)
       notify "✅ セーブして停止しました (${ELAPSED} 秒)" "再開するには /pal start を実行してください。" green ;;

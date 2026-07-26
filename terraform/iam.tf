@@ -55,11 +55,15 @@ data "aws_iam_policy_document" "instance" {
     ]
   }
 
-  # guardian が自分の ASG 状態 (Terminating:Wait) を監視し、停止完了を報告する。
-  # これらの API はリソースレベル制限が効かないため Condition で自 ASG に絞る。
+  # guardian が自分の ASG 状態 (Terminating:Wait) を監視し、
+  # graceful-stop が停止原因 (ユーザー停止 or 置き換え) を desired 値で判定する。
+  # Describe 系 API はリソースレベル制限が効かない。
   statement {
-    sid       = "AsgDescribe"
-    actions   = ["autoscaling:DescribeAutoScalingInstances"]
+    sid = "AsgDescribe"
+    actions = [
+      "autoscaling:DescribeAutoScalingInstances",
+      "autoscaling:DescribeAutoScalingGroups",
+    ]
     resources = ["*"]
   }
 
