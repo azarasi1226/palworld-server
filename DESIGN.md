@@ -389,14 +389,15 @@ pal/
 ├── DESIGN.md                          この設計書
 ├── README.md                          セットアップ手順・運用手順・トラブルシュート
 ├── terraform/
-│   ├── versions.tf                    provider 定義
+│   ├── versions.tf                    provider 定義 / S3 バックエンド
 │   ├── variables.tf                   入力変数
-│   ├── main.tf                        locals / VPC / サブネット / SG / データソース
+│   ├── main.tf                        データソース / locals (実リソースは持たない)
+│   ├── network.tf                     VPC / サブネット / IGW / セキュリティグループ
 │   ├── s3.tf                          バケット・バージョニング・ライフサイクル・スクリプト配置
 │   ├── ssm.tf                         SecureString パラメータ (webhook / admin パスワード)
 │   ├── iam.tf                         インスタンスロール / Lambda ロール
 │   ├── asg.tf                         起動テンプレート / ASG / ライフサイクルフック
-│   ├── lambda.tf                      Lambda / Function URL / EventBridge ルール
+│   ├── lambda.tf                      Lambda / API Gateway / EventBridge ルール
 │   ├── outputs.tf                     Interactions Endpoint URL, 接続先ホスト名 等
 │   ├── templates/user_data.sh.tftpl   最小ブートストラップ (S3 からスクリプト取得 → install.sh)
 │   └── terraform.tfvars.example

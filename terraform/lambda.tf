@@ -87,6 +87,15 @@ resource "aws_lambda_permission" "apigateway" {
 
 # ---------------------------------------------------------------------------
 # 通知 B 系統: インスタンスの生死に関係なく届く AWS 側イベント。
+#
+# EventBridge から Lambda を呼ぶには、以下の 3 点セットが揃う必要がある。
+# 1 つでも欠けると通知は届かない。
+#
+#   ┌─ EventBridge 側 (送る) ────┐      ┌─ Lambda 側 (受ける) ──────┐
+#   │ event_rule   どのイベントか │      │ lambda_permission          │
+#   │      ↓                     │──呼出─▶│ 「この ARN からの呼び出しを │
+#   │ event_target どこへ送るか   │      │   受け付ける」              │
+#   └────────────────────────────┘      └────────────────────────────┘
 # ---------------------------------------------------------------------------
 
 resource "aws_cloudwatch_event_rule" "spot_interruption" {
@@ -112,6 +121,9 @@ resource "aws_cloudwatch_event_rule" "launch_failure" {
   })
 }
 
+# --- 送る側: どのルールが発火したら、どこへ配送するか ---
+# arn に指定した Lambda が配送先になる。
+
 resource "aws_cloudwatch_event_target" "spot_interruption" {
   rule = aws_cloudwatch_event_rule.spot_interruption.name
   arn  = aws_lambda_function.discord.arn
@@ -121,6 +133,9 @@ resource "aws_cloudwatch_event_target" "launch_failure" {
   rule = aws_cloudwatch_event_rule.launch_failure.name
   arn  = aws_lambda_function.discord.arn
 }
+
+# --- 受ける側: Lambda が「このルールからの呼び出しを受け入れる」と宣言する ---
+# 上の target とペアで機能する。詳細はこのセクション冒頭のコメント参照。
 
 resource "aws_lambda_permission" "eventbridge_spot" {
   statement_id  = "AllowSpotInterruptionEvent"
