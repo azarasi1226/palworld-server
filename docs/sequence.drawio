@@ -1,0 +1,661 @@
+<mxfile host="65bd71144e">
+    <diagram name="起動シーケンス" id="boot-sequence">
+        <mxGraphModel dx="1273" dy="577" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1500" pageHeight="1150" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="btitle" value="起動シーケンス  ―  /pal start から接続可能まで（通常 2〜3 分 / 初回 6〜8 分）" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=18;fontStyle=1;fontColor=#232F3E;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="20" width="900" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="bl1" value="Discord" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#5865F2;strokeColor=none;fontColor=#ffffff;fontSize=12;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="80" width="130" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="bl2" value="Lambda" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D05C17;strokeColor=none;fontColor=#ffffff;fontSize=12;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="250" y="80" width="130" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="bl3" value="ASG" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D86613;strokeColor=none;fontColor=#ffffff;fontSize=12;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="440" y="80" width="130" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="bl4" value="EC2 / install.sh" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#232F3E;strokeColor=none;fontColor=#ffffff;fontSize=12;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="630" y="80" width="200" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="bl5" value="S3" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#277116;strokeColor=none;fontColor=#ffffff;fontSize=12;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="900" y="80" width="130" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="bl6" value="Route 53" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#5A30B5;strokeColor=none;fontColor=#ffffff;fontSize=12;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="1100" y="80" width="130" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="bll1" value="" style="endArrow=none;dashed=1;html=1;strokeColor=#B0B0B0;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="125" y="120" as="sourcePoint"/>
+                        <mxPoint x="125" y="1090" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="bll2" value="" style="endArrow=none;dashed=1;html=1;strokeColor=#B0B0B0;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="315" y="120" as="sourcePoint"/>
+                        <mxPoint x="315" y="1090" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="bll3" value="" style="endArrow=none;dashed=1;html=1;strokeColor=#B0B0B0;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="505" y="120" as="sourcePoint"/>
+                        <mxPoint x="505" y="1090" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="bll4" value="" style="endArrow=none;dashed=1;html=1;strokeColor=#B0B0B0;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="730" y="120" as="sourcePoint"/>
+                        <mxPoint x="730" y="1090" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="bll5" value="" style="endArrow=none;dashed=1;html=1;strokeColor=#B0B0B0;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="965" y="120" as="sourcePoint"/>
+                        <mxPoint x="965" y="1090" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="bll6" value="" style="endArrow=none;dashed=1;html=1;strokeColor=#B0B0B0;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="1165" y="120" as="sourcePoint"/>
+                        <mxPoint x="1165" y="1090" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="b1" value="/pal start" style="html=1;verticalAlign=bottom;endArrow=block;strokeColor=#5865F2;strokeWidth=2;fontSize=11;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="125" y="160" as="sourcePoint"/>
+                        <mxPoint x="315" y="160" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="b2" value="SetDesiredCapacity(1)" style="html=1;verticalAlign=bottom;endArrow=block;strokeColor=#D86613;strokeWidth=2;fontSize=11;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="315" y="200" as="sourcePoint"/>
+                        <mxPoint x="505" y="200" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="b3" value="「起動を受け付けました」" style="html=1;verticalAlign=bottom;endArrow=block;dashed=1;strokeColor=#5865F2;fontSize=11;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="315" y="240" as="sourcePoint"/>
+                        <mxPoint x="125" y="240" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="bnote1" value="ASG が 44 プール（11 タイプ × 4 AZ）から&#xa;空きスポット枠を探して起動" style="text;html=1;strokeColor=#D86613;fillColor=#FFF4E5;align=left;verticalAlign=middle;rounded=1;fontSize=10;spacing=6;" parent="1" vertex="1">
+                    <mxGeometry x="380" y="270" width="250" height="45" as="geometry"/>
+                </mxCell>
+                <mxCell id="b4" value="インスタンス起動 → user_data 実行" style="html=1;verticalAlign=bottom;endArrow=block;strokeColor=#232F3E;strokeWidth=2;fontSize=11;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="505" y="340" as="sourcePoint"/>
+                        <mxPoint x="730" y="340" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="bphase1" value="① OS 準備" style="text;html=1;strokeColor=none;fillColor=#EEEEEE;align=center;verticalAlign=middle;rounded=1;fontSize=11;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="600" y="370" width="260" height="26" as="geometry"/>
+                </mxCell>
+                <mxCell id="b5" value="スクリプト一式を取得" style="html=1;verticalAlign=bottom;endArrow=block;strokeColor=#277116;strokeWidth=2;fontSize=11;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="730" y="425" as="sourcePoint"/>
+                        <mxPoint x="965" y="425" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="bnote2" value="steamcmd 導入 / スワップ 4GB 作成 / palworld ユーザー作成" style="text;html=1;strokeColor=#999999;fillColor=#FAFAFA;align=left;verticalAlign=middle;rounded=1;fontSize=10;spacing=6;" parent="1" vertex="1">
+                    <mxGeometry x="600" y="440" width="330" height="26" as="geometry"/>
+                </mxCell>
+                <mxCell id="bphase2" value="② DNS 更新" style="text;html=1;strokeColor=none;fillColor=#EEEEEE;align=center;verticalAlign=middle;rounded=1;fontSize=11;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="600" y="480" width="260" height="26" as="geometry"/>
+                </mxCell>
+                <mxCell id="b6" value="自分の Public IP を A レコードへ UPSERT（TTL 60s）" style="html=1;verticalAlign=bottom;endArrow=block;strokeColor=#5A30B5;strokeWidth=2;fontSize=11;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="730" y="535" as="sourcePoint"/>
+                        <mxPoint x="1165" y="535" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="bphase3" value="③ ゲーム本体の用意" style="text;html=1;strokeColor=none;fillColor=#EEEEEE;align=center;verticalAlign=middle;rounded=1;fontSize=11;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="600" y="560" width="260" height="26" as="geometry"/>
+                </mxCell>
+                <mxCell id="b7" value="gamecache/palserver.tar.zst を展開" style="html=1;verticalAlign=bottom;endArrow=block;dashed=1;strokeColor=#277116;strokeWidth=2;fontSize=11;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="965" y="615" as="sourcePoint"/>
+                        <mxPoint x="730" y="615" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="bnote3" value="キャッシュが無ければ steamcmd でフル取得（初回のみ 5〜8 分）。&#xa;取得後 buildid が変わっていれば裏でキャッシュを作り直す。" style="text;html=1;strokeColor=#999999;fillColor=#FAFAFA;align=left;verticalAlign=middle;rounded=1;fontSize=10;spacing=6;" parent="1" vertex="1">
+                    <mxGeometry x="600" y="630" width="360" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="bphase4" value="④ セーブ復元　★ここが最重要" style="text;html=1;strokeColor=#B85450;fillColor=#F8CECC;align=center;verticalAlign=middle;rounded=1;fontSize=11;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="600" y="690" width="260" height="26" as="geometry"/>
+                </mxCell>
+                <mxCell id="b8" value="lock/active.json を確認（前任者の最終セーブを待つ）" style="html=1;verticalAlign=bottom;endArrow=block;strokeColor=#CC9900;strokeWidth=2;fontSize=11;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="730" y="745" as="sourcePoint"/>
+                        <mxPoint x="965" y="745" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="bnote4" value="ロックが残っていれば、消えるか 90 秒古くなるまで待機。&#xa;これが無いと「古いセーブで復元 → 上書き」で進行が消える。" style="text;html=1;strokeColor=#CC9900;fillColor=#FFF9E6;align=left;verticalAlign=middle;rounded=1;fontSize=10;spacing=6;" parent="1" vertex="1">
+                    <mxGeometry x="600" y="760" width="360" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="b9" value="saves/latest.tar.zst を取得 → 検証 → 展開" style="html=1;verticalAlign=bottom;endArrow=block;dashed=1;strokeColor=#277116;strokeWidth=3;fontSize=11;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="965" y="830" as="sourcePoint"/>
+                        <mxPoint x="730" y="830" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="bnote5" value="検証 NG ならバージョン履歴 → archive/ の順にフォールバック。&#xa;復元後、Level.sav が最新のワールドを DedicatedServerName に書く。&#xa;（これを忘れると新規ワールドが作られ「キャラクリからやり直し」になる）" style="text;html=1;strokeColor=#277116;fillColor=#F2FBEF;align=left;verticalAlign=middle;rounded=1;fontSize=10;spacing=6;" parent="1" vertex="1">
+                    <mxGeometry x="580" y="845" width="380" height="52" as="geometry"/>
+                </mxCell>
+                <mxCell id="b10" value="lock/active.json を自分の ID で作成" style="html=1;verticalAlign=bottom;endArrow=block;strokeColor=#CC9900;strokeWidth=2;fontSize=11;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="730" y="915" as="sourcePoint"/>
+                        <mxPoint x="965" y="915" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="bphase5" value="⑤ 設定生成 → systemd 起動" style="text;html=1;strokeColor=none;fillColor=#EEEEEE;align=center;verticalAlign=middle;rounded=1;fontSize=11;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="600" y="940" width="260" height="26" as="geometry"/>
+                </mxCell>
+                <mxCell id="bnote6" value="PalWorldSettings.ini を tfvars の値から生成（セーブには含めない）&#xa;→ palworld / pal-guardian / pal-idle / backup.timer / status.timer を enable" style="text;html=1;strokeColor=#999999;fillColor=#FAFAFA;align=left;verticalAlign=middle;rounded=1;fontSize=10;spacing=6;" parent="1" vertex="1">
+                    <mxGeometry x="580" y="975" width="400" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="b11" value="RCON が応答するまで最大 300 秒待機 → 「🎮 サーバーが起動しました」" style="html=1;verticalAlign=bottom;endArrow=block;dashed=1;strokeColor=#5865F2;strokeWidth=2;fontSize=11;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="730" y="1055" as="sourcePoint"/>
+                        <mxPoint x="125" y="1055" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+    <diagram name="停止① ユーザー操作" id="stop-user">
+        <mxGraphModel dx="1273" dy="577" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="960" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="utitle" value="停止シーケンス ①  ―  ユーザー操作（/pal stop・/pal restart）" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=18;fontStyle=1;fontColor=#232F3E;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="20" width="900" height="34" as="geometry"/>
+                </mxCell>
+                <mxCell id="usub" value="Discord からの指示で ASG の desired を 0 にする。時間の制約はなく、落ち着いてセーブできる" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=12;fontStyle=2;fontColor=#666666;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="54" width="1000" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="uh1" value="Discord" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#5865F2;strokeColor=none;fontColor=#ffffff;fontSize=12;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="100" width="120" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="uh2" value="Lambda" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D05C17;strokeColor=none;fontColor=#ffffff;fontSize=12;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="240" y="100" width="120" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="uh3" value="ASG" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D86613;strokeColor=none;fontColor=#ffffff;fontSize=12;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="420" y="100" width="120" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="uh4" value="guardian" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#7c2d2d;strokeColor=none;fontColor=#ffffff;fontSize=12;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="600" y="100" width="120" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="uh5" value="graceful-stop.sh" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#232F3E;strokeColor=none;fontColor=#ffffff;fontSize=12;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="780" y="100" width="150" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="uh6" value="PalServer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#8C4FFF;strokeColor=none;fontColor=#ffffff;fontSize=12;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="990" y="100" width="110" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="uh7" value="S3" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#277116;strokeColor=none;fontColor=#ffffff;fontSize=12;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="1160" y="100" width="110" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="ul1" style="endArrow=none;dashed=1;html=1;strokeColor=#B0B0B0;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="120" y="140" as="sourcePoint"/>
+                        <mxPoint x="120" y="860" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="ul2" style="endArrow=none;dashed=1;html=1;strokeColor=#B0B0B0;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="300" y="140" as="sourcePoint"/>
+                        <mxPoint x="300" y="860" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="ul3" style="endArrow=none;dashed=1;html=1;strokeColor=#B0B0B0;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="480" y="140" as="sourcePoint"/>
+                        <mxPoint x="480" y="860" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="ul4" style="endArrow=none;dashed=1;html=1;strokeColor=#B0B0B0;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="660" y="140" as="sourcePoint"/>
+                        <mxPoint x="660" y="860" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="ul5" style="endArrow=none;dashed=1;html=1;strokeColor=#B0B0B0;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="855" y="140" as="sourcePoint"/>
+                        <mxPoint x="855" y="860" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="ul6" style="endArrow=none;dashed=1;html=1;strokeColor=#B0B0B0;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="1045" y="140" as="sourcePoint"/>
+                        <mxPoint x="1045" y="860" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="ul7" style="endArrow=none;dashed=1;html=1;strokeColor=#B0B0B0;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="1215" y="140" as="sourcePoint"/>
+                        <mxPoint x="1215" y="860" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="up1" value="停止の指示" style="text;html=1;strokeColor=none;fillColor=#EEEEEE;align=left;verticalAlign=middle;rounded=1;fontSize=11;fontStyle=1;spacing=8;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="165" width="1250" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="ua1" value="/pal stop" style="html=1;verticalAlign=bottom;endArrow=block;strokeColor=#5865F2;strokeWidth=2;fontSize=11;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="120" y="215" as="sourcePoint"/>
+                        <mxPoint x="300" y="215" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="ua2" value="SetDesiredCapacity(0)" style="html=1;verticalAlign=bottom;endArrow=block;strokeColor=#D86613;strokeWidth=2;fontSize=11;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="300" y="250" as="sourcePoint"/>
+                        <mxPoint x="480" y="250" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="ua3" value="「セーブして停止中…」" style="html=1;verticalAlign=bottom;endArrow=block;dashed=1;strokeColor=#5865F2;fontSize=11;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="300" y="285" as="sourcePoint"/>
+                        <mxPoint x="120" y="285" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="ua4" value="Terminating:Wait（フックで最大 300 秒待つ）" style="html=1;verticalAlign=bottom;endArrow=block;strokeColor=#D86613;strokeWidth=2;fontSize=11;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="480" y="325" as="sourcePoint"/>
+                        <mxPoint x="660" y="325" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="uan" value="guardian が 15 秒以内に検知（ASG の状態をポーリング）" style="text;html=1;strokeColor=#7c2d2d;fillColor=#FBEAEA;align=left;verticalAlign=middle;rounded=1;fontSize=10;spacing=6;" parent="1" vertex="1">
+                    <mxGeometry x="540" y="340" width="330" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="ua5" value="graceful-stop.sh lifecycle" style="html=1;verticalAlign=bottom;endArrow=block;strokeColor=#7c2d2d;strokeWidth=3;fontSize=11;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="660" y="395" as="sourcePoint"/>
+                        <mxPoint x="855" y="395" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="up2" value="原因の判定 ─ desired が 0 なので「ユーザー操作」と分かる（スポット回収なら 1 のまま）" style="text;html=1;strokeColor=none;fillColor=#EEEEEE;align=left;verticalAlign=middle;rounded=1;fontSize=11;fontStyle=1;spacing=8;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="420" width="1250" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="ub1" value="desired を確認" style="html=1;verticalAlign=bottom;endArrow=block;dashed=1;strokeColor=#666666;fontSize=11;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="855" y="470" as="sourcePoint"/>
+                        <mxPoint x="480" y="470" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="ub2" value="🛑【原因: ユーザー操作】セーブして停止します" style="html=1;verticalAlign=bottom;endArrow=block;dashed=1;strokeColor=#5865F2;strokeWidth=2;fontSize=11;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="855" y="505" as="sourcePoint"/>
+                        <mxPoint x="120" y="505" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="up3" value="セーブして S3 へ退避" style="text;html=1;strokeColor=#82B366;fillColor=#D5E8D4;align=left;verticalAlign=middle;rounded=1;fontSize=11;fontStyle=1;spacing=8;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="535" width="1250" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="uc1" value="Broadcast → Save（メモリ上のワールドをフラッシュ）" style="html=1;verticalAlign=bottom;endArrow=block;strokeColor=#8C4FFF;strokeWidth=2;fontSize=11;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="855" y="585" as="sourcePoint"/>
+                        <mxPoint x="1045" y="585" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="uc2" value="スナップショット → 整合性チェック → tar+zstd → 単一オブジェクトで PUT" style="html=1;verticalAlign=bottom;endArrow=block;strokeColor=#277116;strokeWidth=3;fontSize=11;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="855" y="625" as="sourcePoint"/>
+                        <mxPoint x="1215" y="625" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="up4" value="終了処理" style="text;html=1;strokeColor=none;fillColor=#EEEEEE;align=left;verticalAlign=middle;rounded=1;fontSize=11;fontStyle=1;spacing=8;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="655" width="1250" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="ud1" value="Shutdown → 効かなければ systemctl stop" style="html=1;verticalAlign=bottom;endArrow=block;strokeColor=#8C4FFF;strokeWidth=2;fontSize=11;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="855" y="705" as="sourcePoint"/>
+                        <mxPoint x="1045" y="705" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="ud2" value="ログ退避 → status.json → ロック削除（必ずセーブ完了後）" style="html=1;verticalAlign=bottom;endArrow=block;strokeColor=#CC9900;strokeWidth=2;fontSize=11;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="855" y="745" as="sourcePoint"/>
+                        <mxPoint x="1215" y="745" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="ud3" value="CompleteLifecycleAction（待たせずに終了させる）" style="html=1;verticalAlign=bottom;endArrow=block;strokeColor=#D86613;strokeWidth=2;fontSize=11;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="855" y="790" as="sourcePoint"/>
+                        <mxPoint x="480" y="790" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="ud4" value="✅ セーブして停止しました" style="html=1;verticalAlign=bottom;endArrow=block;dashed=1;strokeColor=#5865F2;strokeWidth=2;fontSize=11;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="855" y="830" as="sourcePoint"/>
+                        <mxPoint x="120" y="830" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="uend" value="&lt;b&gt;このあと&lt;/b&gt;　desired = 0 のままなので ASG は作り直さない。次に /pal start を打つまで停止（課金は S3 と Route 53 のみ ＝ 月 $1 未満）。&#xa;なお /pal restart の場合は、インスタンスが完全に消えるのを待ってから Lambda が desired を 1 に戻す（先に戻すと古いセーブで復元される恐れがあるため）。" style="text;html=1;strokeColor=#6C8EBF;fillColor=#DAE8FC;align=left;verticalAlign=middle;rounded=1;fontSize=11;spacing=8;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="880" width="1250" height="46" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+    <diagram name="停止② 無人による自動停止" id="stop-idle">
+        <mxGraphModel dx="1273" dy="577" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="960" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="ititle" value="停止シーケンス ②  ―  15 分間 接続者ゼロによる自動停止（消し忘れ防止）" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=18;fontStyle=1;fontColor=#232F3E;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="20" width="1000" height="34" as="geometry"/>
+                </mxCell>
+                <mxCell id="isub" value="サーバー内部の idle-watcher が自分で気づいて自分で止まる。Discord も ASG も関与しないのが他の停止パターンとの違い" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=12;fontStyle=2;fontColor=#666666;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="54" width="1100" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="ih1" value="Discord" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#5865F2;strokeColor=none;fontColor=#ffffff;fontSize=12;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="100" width="120" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="ih2" value="ASG" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D86613;strokeColor=none;fontColor=#ffffff;fontSize=12;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="240" y="100" width="120" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="ih3" value="idle-watcher&#xa;(60 秒周期)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#5A7A2E;strokeColor=none;fontColor=#ffffff;fontSize=12;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="420" y="100" width="140" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="ih4" value="graceful-stop.sh" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#232F3E;strokeColor=none;fontColor=#ffffff;fontSize=12;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="630" y="100" width="150" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="ih5" value="PalServer&#xa;(RCON)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#8C4FFF;strokeColor=none;fontColor=#ffffff;fontSize=12;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="850" y="100" width="120" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="ih6" value="S3" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#277116;strokeColor=none;fontColor=#ffffff;fontSize=12;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="1040" y="100" width="120" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="il1" style="endArrow=none;dashed=1;html=1;strokeColor=#B0B0B0;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="120" y="140" as="sourcePoint"/>
+                        <mxPoint x="120" y="860" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="il2" style="endArrow=none;dashed=1;html=1;strokeColor=#B0B0B0;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="300" y="140" as="sourcePoint"/>
+                        <mxPoint x="300" y="860" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="il3" style="endArrow=none;dashed=1;html=1;strokeColor=#B0B0B0;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="490" y="140" as="sourcePoint"/>
+                        <mxPoint x="490" y="860" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="il4" style="endArrow=none;dashed=1;html=1;strokeColor=#B0B0B0;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="705" y="140" as="sourcePoint"/>
+                        <mxPoint x="705" y="860" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="il5" style="endArrow=none;dashed=1;html=1;strokeColor=#B0B0B0;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="910" y="140" as="sourcePoint"/>
+                        <mxPoint x="910" y="860" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="il6" style="endArrow=none;dashed=1;html=1;strokeColor=#B0B0B0;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="1100" y="140" as="sourcePoint"/>
+                        <mxPoint x="1100" y="860" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="ip0" value="起動から 10 分間 ─ 判定しない猶予" style="text;html=1;strokeColor=#82B366;fillColor=#D5E8D4;align=left;verticalAlign=middle;rounded=1;fontSize=11;fontStyle=1;spacing=8;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="165" width="1150" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="ip0n" value="誰かが /pal start を打った直後は当然 0 人。すぐ判定を始めると「起動したのに誰も繋ぐ前に落ちる」ため待つ" style="text;html=1;strokeColor=#82B366;fillColor=#F2FBEF;align=left;verticalAlign=middle;rounded=1;fontSize=10;spacing=6;" parent="1" vertex="1">
+                    <mxGeometry x="330" y="195" width="620" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="ip1" value="60 秒ごとの監視ループ" style="text;html=1;strokeColor=none;fillColor=#EEEEEE;align=left;verticalAlign=middle;rounded=1;fontSize=11;fontStyle=1;spacing=8;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="240" width="1150" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="iloop" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#5A7A2E;dashed=1;strokeWidth=2;" parent="1" vertex="1">
+                    <mxGeometry x="440" y="275" width="560" height="150" as="geometry"/>
+                </mxCell>
+                <mxCell id="iloopl" value="loop [60 秒ごと]" style="text;html=1;strokeColor=#5A7A2E;fillColor=#EAF2E0;align=center;verticalAlign=middle;fontSize=10;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="440" y="275" width="110" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="ia1" value="RCON ShowPlayers" style="html=1;verticalAlign=bottom;endArrow=block;strokeColor=#8C4FFF;strokeWidth=2;fontSize=11;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="490" y="325" as="sourcePoint"/>
+                        <mxPoint x="910" y="325" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="ia2" value="接続人数（ヘッダ行を除いた行数）" style="html=1;verticalAlign=bottom;endArrow=block;dashed=1;strokeColor=#8C4FFF;fontSize=11;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="910" y="360" as="sourcePoint"/>
+                        <mxPoint x="490" y="360" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="ia3" value="1 人でもいれば カウンタをリセット。RCON が応答しない時も リセット（遊んでいる最中に落とすのが最悪のため）" style="text;html=1;strokeColor=#999999;fillColor=#FAFAFA;align=left;verticalAlign=middle;rounded=1;fontSize=10;spacing=6;" parent="1" vertex="1">
+                    <mxGeometry x="455" y="375" width="530" height="36" as="geometry"/>
+                </mxCell>
+                <mxCell id="ip2" value="0 人が 15 分続いた" style="text;html=1;strokeColor=#D6B656;fillColor=#FFF2CC;align=left;verticalAlign=middle;rounded=1;fontSize=11;fontStyle=1;spacing=8;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="445" width="1150" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="ib1" value="graceful-stop.sh idle" style="html=1;verticalAlign=bottom;endArrow=block;strokeColor=#5A7A2E;strokeWidth=3;fontSize=11;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="490" y="500" as="sourcePoint"/>
+                        <mxPoint x="705" y="500" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="ib2" value="💤【原因: 15 分間接続なし】セーブして停止します" style="html=1;verticalAlign=bottom;endArrow=block;dashed=1;strokeColor=#5865F2;strokeWidth=2;fontSize=11;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="705" y="540" as="sourcePoint"/>
+                        <mxPoint x="120" y="540" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="ip3" value="セーブして S3 へ退避" style="text;html=1;strokeColor=#82B366;fillColor=#D5E8D4;align=left;verticalAlign=middle;rounded=1;fontSize=11;fontStyle=1;spacing=8;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="570" width="1150" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="ic1" value="Save（メモリ上のワールドをフラッシュ）" style="html=1;verticalAlign=bottom;endArrow=block;strokeColor=#8C4FFF;strokeWidth=2;fontSize=11;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="705" y="620" as="sourcePoint"/>
+                        <mxPoint x="910" y="620" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="ic2" value="スナップショット → 整合性チェック → tar+zstd → 単一オブジェクトで PUT" style="html=1;verticalAlign=bottom;endArrow=block;strokeColor=#277116;strokeWidth=3;fontSize=11;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="705" y="660" as="sourcePoint"/>
+                        <mxPoint x="1100" y="660" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="ip4" value="終了処理 ─ ここが他パターンとの決定的な違い" style="text;html=1;strokeColor=#D86613;fillColor=#FFF4E5;align=left;verticalAlign=middle;rounded=1;fontSize=11;fontStyle=1;spacing=8;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="690" width="1150" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="id1" value="Shutdown → ログ退避 → status.json → ロック削除" style="html=1;verticalAlign=bottom;endArrow=block;strokeColor=#CC9900;strokeWidth=2;fontSize=11;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="705" y="740" as="sourcePoint"/>
+                        <mxPoint x="1100" y="740" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="id2" value="SetDesiredCapacity(0) ─ 自分で自分を終了させる" style="html=1;verticalAlign=bottom;endArrow=block;strokeColor=#D86613;strokeWidth=3;fontSize=11;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="705" y="785" as="sourcePoint"/>
+                        <mxPoint x="300" y="785" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="id2n" value="ユーザー操作では ASG が先に desired=0 にしていたが、ここでは逆。&#xa;サーバー自身が「もう要らない」と判断して ASG に伝える" style="text;html=1;strokeColor=#D86613;fillColor=#FFF4E5;align=left;verticalAlign=middle;rounded=1;fontSize=10;spacing=6;" parent="1" vertex="1">
+                    <mxGeometry x="330" y="800" width="380" height="36" as="geometry"/>
+                </mxCell>
+                <mxCell id="id3" value="✅ セーブして停止しました" style="html=1;verticalAlign=bottom;endArrow=block;dashed=1;strokeColor=#5865F2;strokeWidth=2;fontSize=11;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="705" y="850" as="sourcePoint"/>
+                        <mxPoint x="120" y="850" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="iend" value="&lt;b&gt;このあと&lt;/b&gt;　desired = 0 になったので停止したまま。この機能があるおかげで「遊び終わって解散したあと止め忘れる」事故が起きない。&#xa;無効にしたい場合は tfvars の idle_shutdown_minutes を 0 にする。" style="text;html=1;strokeColor=#82B366;fillColor=#D5E8D4;align=left;verticalAlign=middle;rounded=1;fontSize=11;spacing=8;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="880" width="1150" height="46" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+    <diagram name="停止③ スポット回収・自動置換" id="stop-spot">
+        <mxGraphModel dx="2673" dy="577" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="1050" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="ptitle" value="停止シーケンス ③  ―  スポット回収 / AWS 都合の自動置換　★2 分の勝負" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=18;fontStyle=1;fontColor=#B85450;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="20" width="900" height="34" as="geometry"/>
+                </mxCell>
+                <mxCell id="psub" value="AWS が枠を回収する。2 分後には強制終了されるため、それまでにセーブを S3 へ届けきる必要がある（実測 約 30 秒）" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=12;fontStyle=2;fontColor=#666666;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="54" width="1000" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="ph1" value="Discord" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#5865F2;strokeColor=none;fontColor=#ffffff;fontSize=12;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="100" width="120" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="ph2" value="AWS / ASG" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D86613;strokeColor=none;fontColor=#ffffff;fontSize=12;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="250" y="100" width="120" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="ph3" value="guardian&#xa;(5 秒周期)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#7c2d2d;strokeColor=none;fontColor=#ffffff;fontSize=12;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="430" y="100" width="140" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="ph4" value="graceful-stop.sh" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#232F3E;strokeColor=none;fontColor=#ffffff;fontSize=12;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="630" y="100" width="150" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="ph5" value="PalServer&#xa;(RCON)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#8C4FFF;strokeColor=none;fontColor=#ffffff;fontSize=12;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="850" y="100" width="120" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="ph6" value="S3" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#277116;strokeColor=none;fontColor=#ffffff;fontSize=12;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="1040" y="100" width="120" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="pl1" style="endArrow=none;dashed=1;html=1;strokeColor=#B0B0B0;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="120" y="140" as="sourcePoint"/>
+                        <mxPoint x="120" y="950" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="pl2" style="endArrow=none;dashed=1;html=1;strokeColor=#B0B0B0;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="310" y="140" as="sourcePoint"/>
+                        <mxPoint x="310" y="950" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="pl3" style="endArrow=none;dashed=1;html=1;strokeColor=#B0B0B0;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="500" y="140" as="sourcePoint"/>
+                        <mxPoint x="500" y="950" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="pl4" style="endArrow=none;dashed=1;html=1;strokeColor=#B0B0B0;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="705" y="140" as="sourcePoint"/>
+                        <mxPoint x="705" y="950" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="pl5" style="endArrow=none;dashed=1;html=1;strokeColor=#B0B0B0;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="910" y="140" as="sourcePoint"/>
+                        <mxPoint x="910" y="950" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="pl6" style="endArrow=none;dashed=1;html=1;strokeColor=#B0B0B0;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="1100" y="140" as="sourcePoint"/>
+                        <mxPoint x="1100" y="950" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="pt0" value="T-2:00　回収の予告" style="text;html=1;strokeColor=#D6B656;fillColor=#FFF2CC;align=left;verticalAlign=middle;rounded=1;fontSize=11;fontStyle=1;spacing=8;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="165" width="1150" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="pa1" value="IMDS の spot/instance-action に「2 分後に終了」が出現" style="html=1;verticalAlign=bottom;endArrow=block;strokeColor=#D6B656;strokeWidth=2;fontSize=11;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="310" y="215" as="sourcePoint"/>
+                        <mxPoint x="500" y="215" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="pa2" value="guardian が 5 秒以内に検知（ポーリング間隔）" style="text;html=1;strokeColor=#7c2d2d;fillColor=#FBEAEA;align=left;verticalAlign=middle;rounded=1;fontSize=10;spacing=6;" parent="1" vertex="1">
+                    <mxGeometry x="380" y="230" width="290" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="pa3" value="EventBridge → Lambda が「⚠ 中断通知」を送信（AWS 側からの保険。インスタンスが死んでいても必ず届く）" style="html=1;verticalAlign=bottom;endArrow=block;dashed=1;strokeColor=#BC1356;strokeWidth=2;fontSize=11;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="310" y="285" as="sourcePoint"/>
+                        <mxPoint x="120" y="285" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="pa4" value="graceful-stop.sh spot" style="html=1;verticalAlign=bottom;endArrow=block;strokeColor=#7c2d2d;strokeWidth=3;fontSize=11;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="500" y="325" as="sourcePoint"/>
+                        <mxPoint x="705" y="325" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="pt1" value="T-1:59　警告（約 1 秒）" style="text;html=1;strokeColor=none;fillColor=#EEEEEE;align=left;verticalAlign=middle;rounded=1;fontSize=11;fontStyle=1;spacing=8;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="350" width="1150" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="pb1" value="⚠【原因: AWS によるスポット回収】誰かが停止したわけではありません" style="html=1;verticalAlign=bottom;endArrow=block;dashed=1;strokeColor=#5865F2;strokeWidth=2;fontSize=11;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="705" y="400" as="sourcePoint"/>
+                        <mxPoint x="120" y="400" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="pb2" value="Broadcast（ゲーム内に警告）" style="html=1;verticalAlign=bottom;endArrow=block;strokeColor=#8C4FFF;strokeWidth=2;fontSize=11;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="705" y="435" as="sourcePoint"/>
+                        <mxPoint x="910" y="435" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="pt2" value="T-1:58 〜 T-1:48　セーブして S3 へ退避　★ここを 2 分以内に終えられるかがすべて" style="text;html=1;strokeColor=#B85450;fillColor=#F8CECC;align=left;verticalAlign=middle;rounded=1;fontSize=11;fontStyle=1;spacing=8;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="465" width="1150" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="pc1" value="RCON Save（メモリ上のワールドをディスクへフラッシュ）" style="html=1;verticalAlign=bottom;endArrow=block;strokeColor=#8C4FFF;strokeWidth=2;fontSize=11;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="705" y="515" as="sourcePoint"/>
+                        <mxPoint x="910" y="515" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="pc2" value="スナップショットコピー → 整合性チェック → tar + zstd（並列圧縮）" style="text;html=1;strokeColor=#999999;fillColor=#FAFAFA;align=left;verticalAlign=middle;rounded=1;fontSize=10;spacing=6;" parent="1" vertex="1">
+                    <mxGeometry x="590" y="530" width="350" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="pc3" value="saves/latest.tar.zst を単一オブジェクトで PUT（＝原子的）" style="html=1;verticalAlign=bottom;endArrow=block;strokeColor=#277116;strokeWidth=4;fontSize=11;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="705" y="585" as="sourcePoint"/>
+                        <mxPoint x="1100" y="585" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="pc4" value="ここまで到達できれば &lt;b&gt;ロスト 0 分&lt;/b&gt;。失敗しても 5 分ごとの定期バックアップが最終防衛線（最大 5 分ロスト）" style="text;html=1;strokeColor=#B85450;fillColor=#F8CECC;align=left;verticalAlign=middle;rounded=1;fontSize=10;spacing=6;" parent="1" vertex="1">
+                    <mxGeometry x="560" y="600" width="580" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="pt3" value="T-1:47 〜 T-1:30　終了処理" style="text;html=1;strokeColor=none;fillColor=#EEEEEE;align=left;verticalAlign=middle;rounded=1;fontSize=11;fontStyle=1;spacing=8;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="645" width="1150" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="pd1" value="Shutdown → 効かなければ systemctl stop" style="html=1;verticalAlign=bottom;endArrow=block;strokeColor=#8C4FFF;strokeWidth=2;fontSize=11;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="705" y="695" as="sourcePoint"/>
+                        <mxPoint x="910" y="695" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="pd2" value="ログ退避 → status.json → lock/active.json を削除（必ずセーブ完了後）" style="html=1;verticalAlign=bottom;endArrow=block;strokeColor=#CC9900;strokeWidth=2;fontSize=11;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="705" y="735" as="sourcePoint"/>
+                        <mxPoint x="1100" y="735" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="pd3" value="✅ 緊急セーブ完了（ロスト 0 分）／別のサーバーで自動復帰します" style="html=1;verticalAlign=bottom;endArrow=block;dashed=1;strokeColor=#5865F2;strokeWidth=2;fontSize=11;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="705" y="785" as="sourcePoint"/>
+                        <mxPoint x="120" y="785" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="pt4" value="T-0:00　AWS が強制終了" style="text;html=1;strokeColor=#B85450;fillColor=#F8CECC;align=left;verticalAlign=middle;rounded=1;fontSize=11;fontStyle=1;spacing=8;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="815" width="1150" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="pe1" value="インスタンス消滅（このタイミングは待ってくれない）" style="html=1;verticalAlign=bottom;endArrow=block;strokeColor=#B85450;strokeWidth=3;fontSize=11;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="310" y="870" as="sourcePoint"/>
+                        <mxPoint x="705" y="870" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="pe2" value="desired = 1 のままなので ASG が別の枠で作り直す → 起動シーケンスへ" style="html=1;verticalAlign=bottom;endArrow=block;strokeColor=#D86613;strokeWidth=3;fontSize=11;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="310" y="920" as="sourcePoint"/>
+                        <mxPoint x="705" y="920" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="pend" value="&lt;b&gt;このあと&lt;/b&gt;　新しいインスタンスが S3 からセーブを復元し、Route 53 を自分の IP に更新する。プレイヤーは数分待って同じアドレスに再接続するだけでよい。&#xa;なお AWS 都合の置換（ヘルスチェック起因など）も desired = 1 のままなので、この図と同じ経路をたどる（通知の【原因】表示だけが変わる）。" style="text;html=1;strokeColor=#82B366;fillColor=#D5E8D4;align=left;verticalAlign=middle;rounded=1;fontSize=11;spacing=8;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="960" width="1150" height="46" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>
