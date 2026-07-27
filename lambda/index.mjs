@@ -433,22 +433,25 @@ async function doCost() {
     out.push("  ─────────────────");
     out.push(`  合計: ${yen(total, fx.rate)}  ($${total.toFixed(2)})`);
     out.push("```");
-    out.push("※ Cost Explorer は反映が半日〜1 日遅れます");
   } else {
     out.push("**今月の実績**: 取得できませんでした");
     out.push("（Cost Explorer が未有効か、Lambda にモジュールが同梱されていません。README のトラブルシュート参照）");
   }
 
-  // --- [B] 今この瞬間 -------------------------------------------------------
+  // --- [B] このセッション ---------------------------------------------------
+  // 上の「今月の実績」と対になる。Cost Explorer の遅延を受けないので、
+  // 今まさに遊んでいるぶんがいくらかを即時に出せる。
   out.push("");
-  out.push("**今この瞬間**");
   const g = await getAsg();
   const inst = g.Instances.find((i) => i.LifecycleState === "InService");
 
   if (!inst) {
+    // 停止中は「セッション」が存在しないので見出しを出し分ける
+    out.push("**現在の状態**");
     out.push("💤 停止中 — EC2 の課金は発生していません");
     out.push("（停止中の負担は S3 と Route 53 のみ = 月 $1 未満）");
   } else {
+    out.push("**このセッション**");
     const d = await ec2.send(new DescribeInstancesCommand({ InstanceIds: [inst.InstanceId] }));
     const i = d.Reservations[0].Instances[0];
 
@@ -473,19 +476,25 @@ async function doCost() {
 
     out.push(`🎮 稼働中: ${i.InstanceType} (${i.Placement.AvailabilityZone})`);
     out.push("```");
-    out.push(`  スポット価格: ${yen(spot, fx.rate)}/時`);
-    out.push(`  EBS + IPv4:   ${yen(ebsIp, fx.rate)}/時`);
+    out.push(`  スポット価格   ${yen(spot, fx.rate)}/時`);
+    out.push(`  EBS + IPv4     ${yen(ebsIp, fx.rate)}/時`);
+    out.push(`  稼働時間       ${Math.floor(upH)}時間${Math.floor((upH % 1) * 60)}分`);
     out.push("  ─────────────────");
-    out.push(`  合計: ${yen(hourly, fx.rate)}/時  ($${hourly.toFixed(4)})`);
+    // 合計は時間単価ではなく「この起動で実際にいくら使ったか」。
+    // 単価は上の内訳で示しているので、ここで繰り返すとノイズになる。
+    out.push(`  合計           ${yen(hourly * upH, fx.rate)}`);
     out.push("```");
-    out.push(`稼働時間: ${Math.floor(upH)}時間${Math.floor((upH % 1) * 60)}分`);
   }
 
+  // --- 注記はまとめて末尾に置く（本文の途中に挟むと読みが途切れるため）---
+  // 実装の都合（Cost Explorer 由来など）は書かない。利用者に伝わらないうえ、
+  // 知っても行動が変わらないため。「反映が遅れる」ことだけ伝われば十分。
   out.push("");
+  if (ce) out.push("_※ 今月の実績は反映が半日〜1 日遅れます_");
   out.push(
     fx.exact
-      ? `_参考為替: $1 = ¥${fx.rate.toFixed(1)}_`
-      : `_参考為替: $1 = ¥${fx.rate}（レート取得に失敗したため概算）_`,
+      ? `_※ 参考為替: $1 = ¥${fx.rate.toFixed(1)}_`
+      : `_※ 参考為替: $1 = ¥${fx.rate}（レート取得に失敗したため概算）_`,
   );
 
   return out.join("\n");

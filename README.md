@@ -8,7 +8,8 @@ Discord から起動・停止できる、AWS スポットインスタンス上�
 
 ![インフラ構成](docs/infrastructure.png)
 
-設計の詳細・なぜこの構成なのかは [DESIGN.md](DESIGN.md) を参照。
+設計の詳細・なぜこの構成なのかは [DESIGN.md](DESIGN.md)、
+サーバー上で何が動いているかは [docs/scripts.md](docs/scripts.md) を参照。
 
 ---
 
@@ -270,7 +271,9 @@ AWS_PROFILE=prod_admin bash scripts/cost.sh
 ├── DESIGN.md        設計書（アーキテクチャ・セーブ保全の仕組み・設計判断の理由）
 ├── docs/
 │   ├── infrastructure.drawio       インフラ構成図（編集用・draw.io で開く）
-│   └── infrastructure.png          同上の書き出し（README 表示用）
+│   ├── infrastructure.png          同上の書き出し（README 表示用）
+│   ├── sequence.drawio             起動・停止のシーケンス図（4 ページ）
+│   └── scripts.md                  サーバー上で動くスクリプト一覧
 ├── terraform/       インフラ一式（VPC / ASG / Lambda / S3 / IAM / Route53）
 ├── server/          EC2 上で動くスクリプト群（S3 経由で配布・AMI 不使用）
 ├── lambda/          Discord Bot（API Gateway / 依存ゼロ）

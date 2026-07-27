@@ -165,7 +165,13 @@ resource "aws_s3_bucket_lifecycle_configuration" "state" {
 # ---------------------------------------------------------------------------
 
 locals {
-  server_files = fileset("${path.module}/../server", "**/*")
+  # .gitignore は Terraform には効かないため、配布対象から明示的に除外する。
+  # (rcon.py を手元で実行すると __pycache__/*.pyc が生まれ、そのまま S3 へ
+  #  上がってしまう。実害は薄いが、配布物に不要なゴミを混ぜない)
+  server_files = toset([
+    for f in fileset("${path.module}/../server", "**/*") :
+    f if !can(regex("(__pycache__|\\.pyc$|\\.DS_Store)", f))
+  ])
 
   content_types = {
     sh      = "text/x-shellscript"
