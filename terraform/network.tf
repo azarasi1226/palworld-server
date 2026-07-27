@@ -2,10 +2,25 @@
 # ネットワークの配管 (VPC / サブネット / ルーティング)。
 #   NAT ゲートウェイは置かない (月 $40 かかる)。
 #   インスタンスはパブリックサブネットに直接置き、パブリック IP を持たせる。
-#
-# 外部への公開面 (セキュリティグループ) は security_group.tf に分けている。
-# ここは一度作ったら基本的に触らない部分。
+#   外部への公開面 (どのポートが開いているか) は security_group.tf。
 # ---------------------------------------------------------------------------
+
+# 対象リージョンで実際にインスタンスを起動できる AZ のみを対象にする。
+data "aws_availability_zones" "available" {
+  state = "available"
+
+  filter {
+    name   = "opt-in-status"
+    values = ["opt-in-not-required"]
+  }
+}
+
+locals {
+  # 各 AZ に /20 のパブリックサブネットを 1 つずつ。
+  # スポットのキャパシティプールは「インスタンスタイプ × AZ」で決まるため、
+  # AZ を全部使うことが中断されにくさに直結する (asg.tf の instance_types と対)。
+  azs = slice(data.aws_availability_zones.available.names, 0, min(4, length(data.aws_availability_zones.available.names)))
+}
 
 resource "aws_vpc" "main" {
   cidr_block           = "10.20.0.0/16"

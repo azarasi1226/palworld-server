@@ -3,6 +3,15 @@
 # EC2 は使い捨てで、ワールドの唯一の永続化先はここ。
 # ---------------------------------------------------------------------------
 
+# バケット名は全世界で一意である必要があるため、アカウント ID + ランダム接尾辞で作る。
+resource "random_id" "suffix" {
+  byte_length = 4
+}
+
+locals {
+  bucket_name = "${var.project_name}-${data.aws_caller_identity.current.account_id}-${random_id.suffix.hex}"
+}
+
 resource "aws_s3_bucket" "state" {
   bucket = local.bucket_name
 

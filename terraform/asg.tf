@@ -3,6 +3,11 @@
 #   Discord の start/stop は desired capacity の 0<->1 切替として実装される。
 # ---------------------------------------------------------------------------
 
+# Ubuntu 24.04 LTS (amd64 / gp3) の最新 AMI。Canonical 公式の SSM パブリックパラメータ。
+data "aws_ssm_parameter" "ubuntu_ami" {
+  name = "/aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id"
+}
+
 resource "aws_launch_template" "server" {
   name          = "${local.name}-server"
   image_id      = data.aws_ssm_parameter.ubuntu_ami.value

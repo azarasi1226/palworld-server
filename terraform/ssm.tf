@@ -3,6 +3,16 @@
 # user_data やログに平文で出さないための置き場。
 # ---------------------------------------------------------------------------
 
+resource "random_password" "admin" {
+  length  = 24
+  special = false # Palworld の ini はクォートを扱えないため英数字に限定する
+}
+
+locals {
+  # 未指定なら自動生成。outputs.tf から terraform output -raw admin_password で取れる。
+  admin_password = var.admin_password != "" ? var.admin_password : random_password.admin.result
+}
+
 resource "aws_ssm_parameter" "discord_webhook" {
   name        = "/${local.name}/discord/webhook_url"
   description = "サーバーからの通知先 Discord Webhook"
