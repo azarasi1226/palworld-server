@@ -6,6 +6,8 @@ Discord から起動・停止できる、AWS スポットインスタンス上�
 - スポット中断されてもセーブは S3 に保全され、別インスタンスで自動復帰
 - 稼働 90 時間/月で **約 $10〜17/月**（停止中は月 $1 未満）
 
+![インフラ構成](docs/infrastructure.drawio.svg)
+
 設計の詳細・なぜこの構成なのかは [DESIGN.md](DESIGN.md) を参照。
 
 ---
@@ -266,8 +268,14 @@ AWS_PROFILE=prod_admin bash scripts/cost.sh
 
 ```text
 ├── DESIGN.md        設計書（アーキテクチャ・セーブ保全の仕組み・設計判断の理由）
+├── docs/
+│   └── infrastructure.drawio.svg   インフラ構成図（draw.io で編集可能な SVG）
 ├── terraform/       インフラ一式（VPC / ASG / Lambda / S3 / IAM / Route53）
 ├── server/          EC2 上で動くスクリプト群（S3 経由で配布・AMI 不使用）
-├── lambda/          Discord Bot（Function URL / 依存ゼロ）
+├── lambda/          Discord Bot（API Gateway / 依存ゼロ）
 └── scripts/         スラッシュコマンド登録
 ```
+
+> 構成図は `.drawio.svg` 形式です。GitHub では画像として表示され、
+> draw.io（VS Code 拡張・ブラウザ版）で開けばそのまま編集できます。
+> 編集後は上書き保存するだけで README の表示にも反映されます。
