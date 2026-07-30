@@ -92,6 +92,43 @@ player_count() {
 STEAMCMD=/usr/games/steamcmd
 PAL_APPID=2394010
 
+# steamcmd を必要になった時点で導入する。
+#
+# 起動経路から外しているのは、S3 キャッシュから復元する通常の起動では
+# steamcmd を一度も使わないため。それでも導入すると
+# multiverse 追加 → i386 アーキテクチャ追加 → apt update → 32bit 依存の取得
+# を通り、起動が 30 秒以上延びる (i386 を足すと apt update 自体も遅くなる)。
+#
+# 使うのは /pal update・キャッシュが無い初回・起動後のバージョン確認だけなので、
+# steamcmd を使う関数 (buildid_latest / run_steamcmd) の側で自分で用意する。
+# こうすると呼び出し側は「あるかどうか」を気にしなくてよい。
+ensure_steamcmd() {
+  [ -x "$STEAMCMD" ] && return 0
+
+  # 起動直後のバージョン確認と /pal update が重なると二重に走りうるため直列化する。
+  exec 6>"$STATE_DIR/steamcmd-install.flock"
+  flock 6
+  [ -x "$STEAMCMD" ] && return 0 # ロック待ちの間に誰かが入れていた
+
+  log "installing steamcmd (first use)"
+  export DEBIAN_FRONTEND=noninteractive
+  add-apt-repository -y multiverse >/dev/null 2>&1
+  dpkg --add-architecture i386
+  apt-get update -qq
+  # ライセンス同意を非対話で通す。
+  echo steam steam/question select "I AGREE" | debconf-set-selections
+  echo steam steam/license note '' | debconf-set-selections
+  # Ubuntu では i386 パッケージのみ提供される。念のため amd64 も試す。
+  apt-get install -y -qq steamcmd:i386 >/dev/null 2>&1 \
+    || apt-get install -y -qq steamcmd >/dev/null 2>&1 || true
+
+  if [ ! -x "$STEAMCMD" ]; then
+    log "ERROR: could not install steamcmd"
+    return 1
+  fi
+  log "steamcmd installed"
+}
+
 # 現在インストールされているバージョン。取れなければ 0。
 buildid_local() {
   grep -Po '"buildid"\s+"\K[0-9]+' \
@@ -101,6 +138,10 @@ buildid_local() {
 # Steam 側の最新バージョン。ダウンロードせず問い合わせるだけ (約 10 秒)。
 # 取得できなければ 0 を返す。呼び出し側は 0 を「判定不能」として扱うこと。
 buildid_latest() {
+  # この関数の戻り値は $(...) で捕まえられるため、標準出力に出せるのは
+  # ビルド番号だけ。ensure_steamcmd はログを出すので標準エラーへ逃がす
+  # (混ざると "24445026" のはずが導入ログ入りの文字列になり、比較が壊れる)。
+  ensure_steamcmd >&2 || { echo 0; return 0; }
   sudo -u palworld HOME=/home/palworld "$STEAMCMD" \
     +login anonymous +app_info_update 1 +app_info_print "$PAL_APPID" +quit 2>/dev/null \
     | tr -d '\r' \
@@ -112,6 +153,7 @@ buildid_latest() {
 # pipefail 下では tee の終了コードが採用されるため PIPESTATUS で拾う。
 run_steamcmd() {
   local rc
+  ensure_steamcmd || return 1
   set +o pipefail
   sudo -u palworld HOME=/home/palworld "$STEAMCMD" \
     +force_install_dir "$PAL_DIR" +login anonymous \

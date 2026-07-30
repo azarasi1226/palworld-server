@@ -22,17 +22,22 @@ if [ ! -f /swapfile ]; then
   echo '/swapfile none swap sw 0 0' >> /etc/fstab
 fi
 
-export DEBIAN_FRONTEND=noninteractive
-add-apt-repository -y multiverse >/dev/null
-dpkg --add-architecture i386
-apt-get update -qq
-# steamcmd のライセンス同意を非対話で通す。
-echo steam steam/question select "I AGREE" | debconf-set-selections
-echo steam steam/license note '' | debconf-set-selections
-# steamcmd は Ubuntu では i386 パッケージのみ。
-apt-get install -y -qq zstd curl jq >/dev/null
-apt-get install -y -qq steamcmd:i386 >/dev/null || apt-get install -y -qq steamcmd >/dev/null
-# STEAMCMD のパスは common.sh が定義している (更新スクリプトと共有するため)。
+# 必要なコマンドは Ubuntu 24.04 の AMI に揃っているため、通常は apt を通らない。
+# 欠けている時だけ入れる (AMI の内容が変わった場合の保険)。
+# ここで apt を必ず実行していた頃は、実質何も入らないのに 10 秒以上かかっていた。
+MISSING=""
+for c in zstd curl jq python3; do
+  command -v "$c" >/dev/null 2>&1 || MISSING="$MISSING $c"
+done
+if [ -n "$MISSING" ]; then
+  log "installing missing packages:$MISSING"
+  export DEBIAN_FRONTEND=noninteractive
+  apt-get update -qq
+  apt-get install -y -qq $MISSING >/dev/null
+fi
+
+# steamcmd はここでは入れない。キャッシュから復元する通常の起動では使わないため、
+# 必要になった時点で ensure_steamcmd() が導入する (common.sh 参照)。
 
 # ---------------------------------------------------------------------------
 # 2. Route53 UPSERT (TTL 60 — 復帰時の再接続を成立させる必須条件)
@@ -95,8 +100,17 @@ fi
 chown -R palworld:palworld "$PAL_HOME"
 
 # PalServer.sh が要求する steamclient.so (64bit) を配置。
+#
+# ★ 探索順が重要。先の 2 つはゲーム本体に同梱されており $PAL_DIR の中にあるため
+#   S3 キャッシュにも含まれる = ダウンロード不要で必ず見つかる。
+#   後の 2 つは steamcmd が作るディレクトリで、$PAL_DIR の外にあるので
+#   キャッシュ復元だけの起動には存在しない。
+#   以前は steamcmd 側しか見ていなかったため、毎回フォールバックの
+#   app_update 1007 (103MB) が走り、起動が 63 秒延びていた。
 sudo -u palworld mkdir -p /home/palworld/.steam/sdk64
-for so in /home/palworld/Steam/linux64/steamclient.so \
+for so in "$PAL_DIR/linux64/steamclient.so" \
+          "$PAL_DIR/Pal/Binaries/Linux/steamclient.so" \
+          /home/palworld/Steam/linux64/steamclient.so \
           /home/palworld/.local/share/Steam/steamcmd/linux64/steamclient.so; do
   if [ -f "$so" ]; then
     sudo -u palworld cp "$so" /home/palworld/.steam/sdk64/steamclient.so
@@ -105,7 +119,10 @@ for so in /home/palworld/Steam/linux64/steamclient.so \
 done
 if [ ! -f /home/palworld/.steam/sdk64/steamclient.so ]; then
   # 最終手段: Steamworks SDK Redist (appid 1007) から取得する。
-  sudo -u palworld HOME=/home/palworld "$STEAMCMD" +login anonymous +app_update 1007 +quit >/dev/null || true
+  # ここへ来るのはゲーム本体が壊れている場合だけなので、steamcmd の導入込みで許容する。
+  log "steamclient.so not found in the game files; falling back to the Steamworks SDK"
+  ensure_steamcmd \
+    && sudo -u palworld HOME=/home/palworld "$STEAMCMD" +login anonymous +app_update 1007 +quit >/dev/null || true
   sudo -u palworld cp "/home/palworld/Steam/steamapps/common/Steamworks SDK Redist/linux64/steamclient.so" \
     /home/palworld/.steam/sdk64/steamclient.so 2>/dev/null || true
 fi
