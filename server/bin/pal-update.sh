@@ -54,8 +54,14 @@ if [ "$LATEST" != "0" ] && [ "$LATEST" = "$CURRENT" ]; then
   exit 0
 fi
 
+# buildid_latest は Steam に届かなかった場合 0 を返す。表示用にだけ言い換える。
+# (${LATEST/0/不明} と書くと数値内の 0 まで置換されてしまう。実際に
+#  24445026 が "24445不明26" と表示される不具合になった)
+LATEST_TEXT="$LATEST"
+[ "$LATEST" = "0" ] && LATEST_TEXT="不明 (Steam に問い合わせできず)"
+
 notify "🔄 サーバーを更新しています" \
-  "現在: build $CURRENT\n最新: build ${LATEST/0/不明}\n\nセーブしてから更新します。完了まで 2〜4 分かかります。" yellow
+  "現在: build $CURRENT\n最新: build $LATEST_TEXT\n\nセーブしてから更新します。完了まで 2〜4 分かかります。" yellow
 
 # --- 2. 更新前の状態を退避 --------------------------------------------------
 # 新バージョンで一度起動すると旧バージョンには戻せなくなることがあるため、
