@@ -58,44 +58,46 @@ $AWS route53 change-resource-record-sets --hosted-zone-id "$PAL_ZONE_ID" \
 log "dns: $PAL_FQDN -> $IP"
 
 # ---------------------------------------------------------------------------
-# 3. ゲーム本体 (S3 キャッシュ復元 → steamcmd で差分パッチ)
+# 3. ゲーム本体を用意する
+#
+#    ここでは「動かせる状態にする」ことだけを行い、更新は一切しない。
+#    更新は /pal update (pal-update.sh) が担当する。
+#    起動のたびに更新を挟むと、更新失敗がそのまま起動失敗になり、
+#    意図しないタイミングでバージョンが上がってしまうため分離している。
 # ---------------------------------------------------------------------------
-APPID=2394010
 mkdir -p "$PAL_DIR"
 
-CACHE_HIT=0
 if $AWS s3 cp "$S3/gamecache/palserver.tar.zst" - 2>/dev/null | zstd -d -q | tar -xf - -C "$PAL_DIR"; then
-  CACHE_HIT=1
-  log "game cache restored from S3"
+  log "game restored from S3 cache (buildid=$(buildid_local))"
 else
-  rm -rf "${PAL_DIR:?}"/* # 途中まで展開された残骸を消してフルインストールへ
-  log "no game cache; full install via steamcmd (first boot takes 5-8 min)"
-  notify "🔧 初回セットアップ中" "ゲーム本体をダウンロードしています (5〜8 分かかります)。" blue
-fi
+  # キャッシュが無い / 壊れている場合だけ steamcmd で取得する。
+  rm -rf "${PAL_DIR:?}"/* # 途中まで展開された残骸を消す
+  log "no usable game cache; installing via steamcmd"
+  notify "🔧 ゲーム本体を取得しています" "初回セットアップのためダウンロードしています (3〜5 分かかります)。" blue
 
-chown -R palworld:palworld "$PAL_HOME"
+  chown -R palworld:palworld "$PAL_HOME"
+  run_steamcmd || log "steamcmd returned non-zero; verifying actual state"
 
-# +app_update はキャッシュありなら差分パッチのみで数十秒。
-# steamcmd は一時的な CDN 不調で落ちることがあるためリトライし、
-# それでも駄目なら通知して明示的に失敗させる (無言で死なせない)。
-run_steamcmd() {
-  sudo -u palworld "$STEAMCMD" +force_install_dir "$PAL_DIR" +login anonymous \
-    +app_update $APPID +quit >/dev/null
-}
-if ! run_steamcmd; then
-  log "steamcmd failed; retrying in 10s"
-  sleep 10
-  if ! run_steamcmd; then
-    notify "🚨 ゲーム本体の取得に失敗しました" "steamcmd が 2 回失敗しました。Steam 側の一時障害の可能性があります。\n/pal stop のあと、時間をおいて /pal start でやり直してください。" red
+  if [ ! -x "$PAL_DIR/PalServer.sh" ]; then
+    log "FATAL: game files are missing after steamcmd"
+    notify "🚨 ゲーム本体の取得に失敗しました" "Steam 側の一時障害の可能性があります。\n時間をおいて /pal start でやり直してください。" red
     exit 1
   fi
 fi
 
+# キャッシュから復元した場合も、中身が壊れていれば起動できない。
+# 早い段階で気づけるよう、ここで実体を確認する。
+if [ ! -x "$PAL_DIR/PalServer.sh" ]; then
+  log "FATAL: PalServer.sh is missing after restoring the cache"
+  notify "🚨 ゲーム本体が壊れています" "S3 のキャッシュが不完全な可能性があります。\ngamecache/ を削除してから /pal start でやり直してください。" red
+  exit 1
+fi
+
+chown -R palworld:palworld "$PAL_HOME"
+
 # PalServer.sh が要求する steamclient.so (64bit) を配置。
-# steamcmd (deb 版) のブートストラップ先は ~/Steam。
 sudo -u palworld mkdir -p /home/palworld/.steam/sdk64
-for so in /home/palworld/Steam/linux64/steamclient.so \
-          /home/palworld/.local/share/Steam/steamcmd/linux64/steamclient.so; do
+for so in /home/palworld/Steam/linux64/steamclient.so           /home/palworld/.local/share/Steam/steamcmd/linux64/steamclient.so; do
   if [ -f "$so" ]; then
     sudo -u palworld cp "$so" /home/palworld/.steam/sdk64/steamclient.so
     break
@@ -103,32 +105,8 @@ for so in /home/palworld/Steam/linux64/steamclient.so \
 done
 if [ ! -f /home/palworld/.steam/sdk64/steamclient.so ]; then
   # 最終手段: Steamworks SDK Redist (appid 1007) から取得する。
-  sudo -u palworld "$STEAMCMD" +login anonymous +app_update 1007 +quit >/dev/null || true
-  sudo -u palworld cp "/home/palworld/Steam/steamapps/common/Steamworks SDK Redist/linux64/steamclient.so" \
-    /home/palworld/.steam/sdk64/steamclient.so 2>/dev/null || true
-fi
-
-# buildid が変わっていたらキャッシュを更新 (アップロードは起動をブロックしないよう裏で)。
-# --exclude ./Pal/Saved が重要: このディレクトリはゲームが書き込み続けるため、
-# 含めると並行する tar が「file changed as we read it」で死ぬ (レース)。
-# セーブは S3 の saves/ が正、設定は毎起動生成なので、キャッシュに入れる理由もない。
-LOCAL_BUILD=$(grep -Po '"buildid"\s+"\K[0-9]+' "$PAL_DIR/steamapps/appmanifest_$APPID.acf" 2>/dev/null || echo 0)
-REMOTE_BUILD=$($AWS s3 cp "$S3/gamecache/buildid.txt" - 2>/dev/null || echo 0)
-if [ "$LOCAL_BUILD" != "$REMOTE_BUILD" ] && [ "$LOCAL_BUILD" != "0" ]; then
-  log "game updated (build $REMOTE_BUILD -> $LOCAL_BUILD); refreshing cache in background"
-  (
-    if tar -C "$PAL_DIR" --exclude ./Pal/Saved -cf - . | zstd -3 -T0 -q > "$WORK_DIR/gamecache.tar.zst"; then
-      if $AWS s3 cp "$WORK_DIR/gamecache.tar.zst" "$S3/gamecache/palserver.tar.zst" --no-progress >/dev/null \
-        && echo "$LOCAL_BUILD" | $AWS s3 cp - "$S3/gamecache/buildid.txt" >/dev/null; then
-        log "game cache uploaded (build $LOCAL_BUILD, $(stat -c %s "$WORK_DIR/gamecache.tar.zst" 2>/dev/null || echo '?')B)"
-      else
-        log "WARN: game cache upload failed (next boot will do a full install)"
-      fi
-    else
-      log "WARN: game cache tar failed (next boot will do a full install)"
-    fi
-    rm -f "$WORK_DIR/gamecache.tar.zst"
-  ) &
+  sudo -u palworld HOME=/home/palworld "$STEAMCMD" +login anonymous +app_update 1007 +quit >/dev/null || true
+  sudo -u palworld cp "/home/palworld/Steam/steamapps/common/Steamworks SDK Redist/linux64/steamclient.so"     /home/palworld/.steam/sdk64/steamclient.so 2>/dev/null || true
 fi
 
 # ---------------------------------------------------------------------------
@@ -244,3 +222,16 @@ else
 fi
 
 log "install done (ready=$READY, ${BOOT_SEC}s)"
+
+# ---------------------------------------------------------------------------
+# 8. 後処理 (キャッシュ保存 / 更新の有無を通知)
+#
+#    数分かかる処理なので install.sh の完了を待たせない。
+#    ただし `&` で流すと cloud-init のサービス終了時に cgroup ごと
+#    後始末されて完走しない恐れがあるため、独立したユニットとして起動する。
+# ---------------------------------------------------------------------------
+if ! systemd-run --unit=pal-post-boot --collect --quiet \
+  /opt/palworld/bin/pal-post-boot.sh 2>/dev/null; then
+  log "WARN: systemd-run failed; running post-boot in the background instead"
+  /opt/palworld/bin/pal-post-boot.sh &
+fi

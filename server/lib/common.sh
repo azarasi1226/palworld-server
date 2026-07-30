@@ -76,6 +76,78 @@ rcon_broadcast() {
 }
 
 # ---------------------------------------------------------------------------
+# ゲーム本体 (steamcmd)
+#   install.sh (初回導入) と pal-update.sh (更新) の両方から使う。
+# ---------------------------------------------------------------------------
+
+STEAMCMD=/usr/games/steamcmd
+PAL_APPID=2394010
+
+# 現在インストールされているバージョン。取れなければ 0。
+buildid_local() {
+  grep -Po '"buildid"\s+"\K[0-9]+' \
+    "$PAL_DIR/steamapps/appmanifest_$PAL_APPID.acf" 2>/dev/null || echo 0
+}
+
+# Steam 側の最新バージョン。ダウンロードせず問い合わせるだけ (約 10 秒)。
+# 取得できなければ 0 を返す。呼び出し側は 0 を「判定不能」として扱うこと。
+buildid_latest() {
+  sudo -u palworld HOME=/home/palworld "$STEAMCMD" \
+    +login anonymous +app_info_update 1 +app_info_print "$PAL_APPID" +quit 2>/dev/null \
+    | tr -d '\r' \
+    | awk '/"public"/{p=1} p && /"buildid"/ {gsub(/[^0-9]/, "", $2); if ($2 != "") {print $2; exit}}' \
+    | head -n1 | grep -E '^[0-9]+$' || echo 0
+}
+
+# steamcmd で本体を導入・更新する。出力はログとファイルの両方へ。
+# pipefail 下では tee の終了コードが採用されるため PIPESTATUS で拾う。
+run_steamcmd() {
+  local rc
+  set +o pipefail
+  sudo -u palworld HOME=/home/palworld "$STEAMCMD" \
+    +force_install_dir "$PAL_DIR" +login anonymous \
+    +app_update "$PAL_APPID" validate +quit 2>&1 \
+    | tee "$WORK_DIR/steamcmd.log" | sed 's/^/  steamcmd| /'
+  rc=${PIPESTATUS[0]}
+  set -o pipefail
+  return "$rc"
+}
+
+# ゲーム本体を S3 キャッシュへ保存する。
+# tar の終了コード 1 は「読み取り中にファイルが変わった」という警告レベル。
+# Pal/Saved は除外しているが、その親 ./Pal の更新時刻はサーバー稼働で変わるため
+# 正常時でも 1 になる。中身は無事なので 2 以上だけを致命的として扱う。
+upload_game_cache() {
+  local build="$1" tar_rc zstd_rc size pipe_rc
+
+  set +o pipefail
+  tar -C "$PAL_DIR" --exclude ./Pal/Saved -cf - . | zstd -3 -T0 -q > "$WORK_DIR/gamecache.tar.zst"
+  # PIPESTATUS は次のコマンドで消えるため、まず配列ごと退避する。
+  pipe_rc=("${PIPESTATUS[@]}")
+  tar_rc=${pipe_rc[0]}
+  zstd_rc=${pipe_rc[1]}
+  set -o pipefail
+
+  size=$(stat -c %s "$WORK_DIR/gamecache.tar.zst" 2>/dev/null || echo 0)
+
+  # 壊れたキャッシュを置くと以降の全起動が壊れるため、必ず検証してから上げる。
+  if [ "$tar_rc" -le 1 ] && [ "$zstd_rc" -eq 0 ] && [ "$size" -gt 500000000 ] \
+    && zstd -t "$WORK_DIR/gamecache.tar.zst" 2>/dev/null; then
+    if $AWS s3 cp "$WORK_DIR/gamecache.tar.zst" "$S3/gamecache/palserver.tar.zst" --no-progress >/dev/null \
+      && echo "$build" | $AWS s3 cp - "$S3/gamecache/buildid.txt" >/dev/null; then
+      log "game cache uploaded (build=$build size=${size}B)"
+      rm -f "$WORK_DIR/gamecache.tar.zst"
+      return 0
+    fi
+    log "WARN: game cache upload failed"
+  else
+    log "WARN: game cache is unusable (tar=$tar_rc zstd=$zstd_rc size=${size}B)"
+  fi
+  rm -f "$WORK_DIR/gamecache.tar.zst"
+  return 1
+}
+
+# ---------------------------------------------------------------------------
 # Discord 通知 (A 系統: インスタンス発)
 # ---------------------------------------------------------------------------
 

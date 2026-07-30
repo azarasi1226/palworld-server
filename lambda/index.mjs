@@ -136,6 +136,7 @@ async function runWorker({ action, token }) {
       case "status":  content = await doStatus(); break;
       case "players": content = await doPlayers(); break;
       case "backup":  content = await doBackup(); break;
+      case "update":  content = await doUpdate(); break;
       case "cost":    content = await doCost(); break;
       default:        content = `未知のコマンドです: ${action}`;
     }
@@ -346,6 +347,89 @@ async function findRunningInstance() {
   const g = await getAsg();
   const inst = g.Instances.find((i) => i.LifecycleState === "InService");
   return inst?.InstanceId ?? null;
+}
+
+// ---------------------------------------------------------------------------
+// ゲーム本体の更新
+//   起動処理からは意図的に分離している。更新失敗が起動失敗になるのを避け、
+//   かつ意図しないタイミングでバージョンが上がるのを防ぐため。
+//   インスタンスは動いたまま、ゲームプロセスだけ止めて入れ替える。
+// ---------------------------------------------------------------------------
+
+async function doUpdate() {
+  const iid = await findRunningInstance();
+  if (!iid) {
+    // 停止中は更新できない。停止 = インスタンスごと終了しており、
+    // steamcmd を走らせる機械が存在しないため。
+    return "💤 サーバーが停止しています。\n`/pal start` で起動してから `/pal update` を実行してください。";
+  }
+
+  // 遊んでいる最中に割り込まないよう、Lambda 側でも先に弾く
+  // (サーバー側でも同じ判定をしている。二重だが、待たせずに返せる利点がある)。
+  const st = await fetchStatusJson();
+  const fresh = st && Math.floor(Date.now() / 1000) - (st.updated_epoch ?? 0) <= Number(STATUS_STALE_SECONDS);
+  if (fresh && st.player_count > 0) {
+    return `⛔ 現在 ${st.player_count} 人が接続中です。\n全員が退出してから実行してください。`;
+  }
+
+  const cmd = await ssm.send(
+    new SendCommandCommand({
+      DocumentName: "AWS-RunShellScript",
+      InstanceIds: [iid],
+      Parameters: {
+        commands: ["/opt/palworld/bin/pal-update.sh"],
+        executionTimeout: ["900"], // ダウンロード + 再起動で最大 15 分
+      },
+    }),
+  );
+
+  const commandId = cmd.Command.CommandId;
+  // 完了は 2〜4 分かかる。ここで待ち切れなくても、サーバー側が
+  // Discord へ結果を通知するので取りこぼしはない。
+  for (let i = 0; i < 22; i++) {
+    await sleep(5000);
+    try {
+      const inv = await ssm.send(
+        new GetCommandInvocationCommand({ CommandId: commandId, InstanceId: iid }),
+      );
+      if (inv.Status === "Success" || inv.Status === "Failed") {
+        return summarizeUpdate(inv.StandardOutputContent ?? "");
+      }
+      if (["Cancelled", "TimedOut"].includes(inv.Status)) {
+        return `⚠️ 更新の実行が中断されました (${inv.Status})。`;
+      }
+    } catch {
+      // InvocationDoesNotExist: 反映待ち
+    }
+  }
+  return "🔄 更新を実行中です。完了すると通知が届きます（2〜4 分）。";
+}
+
+// pal-update.sh が最終行付近に出す UPDATE_RESULT を読んで人向けの文言にする。
+function summarizeUpdate(stdout) {
+  const line = stdout.split("\n").reverse().find((l) => l.includes("UPDATE_RESULT:"));
+  const [kind, a, b] = (line?.split("UPDATE_RESULT:")[1] ?? "").trim().split(/\s+/);
+
+  switch (kind) {
+    case "updated":
+      return `✅ 更新が完了しました。\nbuild ${a} → **${b}**\nクライアント側も最新版に更新してから接続してください。`;
+    case "already_latest":
+      return `ℹ️ すでに最新版です (build ${a})。`;
+    case "no_change":
+      return `ℹ️ 更新はありませんでした (build ${a})。サーバーは再起動しました。`;
+    case "players_online":
+      return `⛔ 現在 ${a} 人が接続中のため中止しました。\n全員が退出してから実行してください。`;
+    case "backup_failed":
+      return "🚨 更新前のバックアップに失敗したため中止しました。\nセーブを守るための動作です。サーバーはそのまま稼働しています。";
+    case "already":
+      return "⏳ すでに更新処理が実行中です。";
+    case "updated_not_ready":
+      return `⚠️ build ${a} → ${b} に更新しましたが、起動を確認できません。\n\`/pal status\` で確認してください。`;
+    case "failed":
+      return "🚨 更新に失敗しました。\n`/pal restart` でクリーンインストールを試してください。セーブは更新前の状態で保全されています。";
+    default:
+      return "🔄 更新を実行しました。結果は通知チャンネルを確認してください。";
+  }
 }
 
 // ---------------------------------------------------------------------------
