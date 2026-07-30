@@ -12,7 +12,13 @@ fi
 log "boot grace: ${PAL_GRACE_MINUTES}m before idle detection starts"
 sleep $(( PAL_GRACE_MINUTES * 60 ))
 
+# RCON 不応答が続いたら知らせるまでの時間。
+# 無人判定が成立しないため、ここで知らせないと課金だけが続く (下記参照)。
+RCON_DEAD_MINUTES=10
+
 IDLE_SINCE=0
+UNKNOWN_SINCE=0
+UNKNOWN_NOTIFIED=0
 log "idle watcher started (threshold ${PAL_IDLE_MINUTES}m)"
 
 while true; do
@@ -25,10 +31,28 @@ while true; do
     # カウンタもリセットして、応答が戻ってから数え直す。
     log "WARN: rcon unreachable; skipping idle check"
     IDLE_SINCE=0
+
+    # ただし黙って続けるのは危険。RCON が死んでいる間は無人判定が永久に
+    # 成立しないため、ゲームがクラッシュループに入ると誰も止めないまま
+    # 課金が続く。しかも status.json は players:[] を返すので、
+    # 外からは「0 人で正常稼働」に見えてしまう。
+    # 自動停止はしない (RCON だけ壊れてゲームは動いている可能性があり、
+    # 遊んでいる人を蹴る判断は人に委ねる)。1 回だけ知らせる。
+    NOW=$(date +%s)
+    [ "$UNKNOWN_SINCE" = "0" ] && UNKNOWN_SINCE=$NOW
+    if [ "$UNKNOWN_NOTIFIED" = "0" ] \
+      && [ $(( (NOW - UNKNOWN_SINCE) / 60 )) -ge "$RCON_DEAD_MINUTES" ]; then
+      log "rcon unreachable for ${RCON_DEAD_MINUTES}m; notifying"
+      notify "⚠️ ゲームが応答していません" \
+        "${RCON_DEAD_MINUTES} 分間サーバーに応答がありません。クラッシュしている可能性があります。\nこの状態では無人自動停止も働かないため、課金が続きます。\n\`/pal restart\` で復旧するか、\`/pal stop\` で停止してください。" yellow
+      UNKNOWN_NOTIFIED=1
+    fi
     continue
   fi
 
-  echo "$COUNT" > "$STATE_DIR/player-count"
+  # 応答が戻った。次に落ちたときも改めて知らせる。
+  UNKNOWN_SINCE=0
+  UNKNOWN_NOTIFIED=0
 
   if [ "$COUNT" -gt 0 ]; then
     IDLE_SINCE=0

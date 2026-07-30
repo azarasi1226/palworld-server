@@ -72,7 +72,7 @@ data "aws_iam_policy_document" "instance" {
     actions = [
       "autoscaling:CompleteLifecycleAction",
       "autoscaling:RecordLifecycleActionHeartbeat",
-      "autoscaling:SetDesiredCapacity", # アイドル自動停止が自分で 0 にする
+      "autoscaling:SetDesiredCapacity", # アイドル停止・起動失敗時に自分で 0 にする
     ]
     resources = [aws_autoscaling_group.server.arn]
   }

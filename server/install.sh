@@ -6,6 +6,28 @@ source /opt/palworld/lib/common.sh
 date -u +%s > "$STATE_DIR/boot-epoch"
 log "install start"
 
+# --- 起動処理が失敗したときに課金を止める ------------------------------------
+# ここで失敗すると、この個体を止められる者が誰もいない状態になる。
+#   ・pal-guardian も pal-idle も、まだ起動していない (step 6 で起動する)
+#   ・EC2 としては正常なので ASG も置き換えない
+# 結果、ゲームが動いていないインスタンスが誰にも気づかれず課金され続ける
+# (1 晩で ¥140、1 週間で ¥2,900)。そのため「失敗したら自分で desired=0 にする」
+# ところまでを install.sh の責任に含める。
+#
+# 個別の exit ではなく trap を使うのは、set -e による想定外の中断も
+# 同じ扱いにするため。step 6 で監視役が立ったら trap は外す (それ以降は
+# 失敗してもサーバーは動いており、無人停止が効くため)。
+on_install_failure() {
+  local rc=$?
+  [ "$rc" = "0" ] && return 0
+  log "install failed (rc=$rc); setting desired=0 to stop billing"
+  notify "🚨 起動に失敗したため停止します" \
+    "セーブは S3 に保全されています。\`/pal start\` でやり直せます。\n繰り返す場合は \`/pal status\` とサーバーのログを確認してください。" red
+  $AWS autoscaling set-desired-capacity \
+    --auto-scaling-group-name "$PAL_PROJECT-server" --desired-capacity 0 2>/dev/null || true
+}
+trap on_install_failure EXIT
+
 # ---------------------------------------------------------------------------
 # 1. OS 準備
 # ---------------------------------------------------------------------------
@@ -260,6 +282,11 @@ systemctl daemon-reload
 systemctl enable --now palworld.service pal-guardian.service pal-idle.service \
   pal-backup.timer pal-status.timer
 
+# 監視役 (guardian / idle) が立ったので、以降は失敗しても放置されない。
+# ここで trap を外さないと、起動後の些細な失敗 (通知の送信エラー等) で
+# 正常に動いているサーバーを止めてしまう。
+trap - EXIT
+
 # ---------------------------------------------------------------------------
 # 7. 起動完了を待って通知
 # ---------------------------------------------------------------------------
@@ -280,8 +307,20 @@ if [ "$READY" = "1" ]; then
     "接続先: **$PAL_FQDN:$PAL_GAME_PORT**\n$([ -n "$SERVER_PASS" ] && echo "パスワード付きサーバーです。")\n${PAL_IDLE_MINUTES} 分無人で自動停止します。" green
   /opt/palworld/bin/pal-status.sh running || true
 else
+  # ここに来たらゲームが一度も立ち上がっていない (クラッシュループ等)。
+  #
+  # 停止まで行うのは、この時点なら「遊んでいる人を蹴る」心配が無いため。
+  # 接続できた人が一人もいないことが確定している (RCON が一度も応答していない)。
+  # 放置すると、無人判定は RCON 不応答では成立しないため誰も止められず、
+  # ゲームが動いていないインスタンスの課金だけが続く。
+  #
+  # desired=0 にすれば ASG の終了指示 → guardian → 安全停止と通常の経路を通り、
+  # ロック解放もログ退避も行われる。ここで独自の停止処理は書かない。
+  log "server never became ready in ${BOOT_SEC}s; setting desired=0 to stop billing"
   notify "🚨 サーバーの起動確認に失敗しました" \
-    "${BOOT_SEC} 秒待ちましたが RCON が応答しません。/pal status で確認してください。" red
+    "${BOOT_SEC} 秒待ちましたが応答がありません。課金を止めるため停止します。\nセーブは S3 に保全されています。\`/pal start\` でやり直せます。\n繰り返す場合はサーバーのログを確認してください。" red
+  $AWS autoscaling set-desired-capacity \
+    --auto-scaling-group-name "$PAL_PROJECT-server" --desired-capacity 0 2>/dev/null || true
 fi
 
 log "install done (ready=$READY, ${BOOT_SEC}s)"
