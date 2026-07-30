@@ -32,9 +32,10 @@ CURRENT=$(buildid_local)
 #   ・遊んでいる本人は誰かが更新したがっていることを知る手段がないため
 #     (ゲーム内 Broadcast で伝える)
 if systemctl is-active --quiet palworld; then
-  PLAYERS=$(rcon "ShowPlayers" 2>/dev/null || true)
-  COUNT=$(echo "$PLAYERS" | tail -n +2 | sed '/^\s*$/d' | wc -l)
-  if [ "${COUNT:-0}" -gt 0 ]; then
+  COUNT=$(player_count || true)
+  # unknown (RCON 不応答) のときは判定できないので、止めずに進める。
+  # サーバーが応答しない状態なら、そもそも誰も遊べていない。
+  if [ "$COUNT" != "unknown" ] && [ "${COUNT:-0}" -gt 0 ]; then
     log "update refused: $COUNT player(s) online"
     rcon_broadcast "UPDATE_REQUESTED_PLEASE_LOGOUT_WHEN_READY"
     notify "⛔ 更新を中止しました" \

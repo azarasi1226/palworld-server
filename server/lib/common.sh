@@ -75,6 +75,15 @@ rcon_broadcast() {
   rcon "Broadcast ${1// /_}" || true
 }
 
+# 接続人数。ShowPlayers は 1 行目がヘッダ (name,playeruid,steamid) なので飛ばす。
+# RCON が応答しない場合は "unknown" を返す。0 を返すと
+# 「誰もいない」と誤解され、無人停止や更新が誤って走るため区別する。
+player_count() {
+  local raw
+  raw=$(rcon "ShowPlayers" 2>/dev/null) || { echo "unknown"; return 1; }
+  echo "$raw" | tail -n +2 | sed '/^\s*$/d' | wc -l
+}
+
 # ---------------------------------------------------------------------------
 # ゲーム本体 (steamcmd)
 #   install.sh (初回導入) と pal-update.sh (更新) の両方から使う。

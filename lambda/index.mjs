@@ -441,6 +441,11 @@ function summarizeUpdate(stdout) {
 const COST_CACHE_KEY = "cost-cache.json";
 const COST_CACHE_TTL = 3600; // 秒
 
+// スポット価格以外の固定費。EC2 API では取れないため実際の構成に合わせて持つ。
+// terraform の root_volume_size を変えたらここも合わせること。
+const ROOT_VOLUME_GB = 40; // gp3 $0.096/GB月 を時間割にする
+const IPV4_PER_HOUR = 0.005; // パブリック IPv4 の時間単価
+
 // --- 為替 -------------------------------------------------------------------
 // 外部 API (ECB ベース・キー不要) から取得するが、落ちても壊れないよう
 // フォールバック定数を持つ。キャッシュは warm コンテナ内のメモリのみ =
@@ -471,14 +476,29 @@ async function getUsdJpy() {
 const yen = (usd, rate) => "¥" + Math.round(usd * rate).toLocaleString("ja-JP");
 
 async function doCost() {
-  const out = ["📊 **コストレポート**", ""];
   const fx = await getUsdJpy();
+  const [monthly, session] = await Promise.all([costThisMonth(fx), costThisSession(fx)]);
 
-  // --- [A] 実績 -------------------------------------------------------------
-  // Cost Explorer は 1 リクエスト $0.01 の有料 API。誰が何回叩いても
-  // 1 時間に 1 回しか実際には課金されないよう S3 にキャッシュする。
+  const out = ["📊 **コストレポート**", "", ...monthly, "", ...session, ""];
+
+  // 注記はまとめて末尾に置く（本文の途中に挟むと読みが途切れるため）。
+  // 実装の都合（Cost Explorer 由来など）は書かない。利用者に伝わらないうえ、
+  // 知っても行動が変わらないため。「反映が遅れる」ことだけ伝われば十分。
+  out.push("_※ 今月の実績は反映が半日〜1 日遅れます_");
+  out.push(
+    fx.exact
+      ? `_※ 参考為替: $1 = ¥${fx.rate.toFixed(1)}_`
+      : `_※ 参考為替: $1 = ¥${fx.rate}（レート取得に失敗したため概算）_`,
+  );
+  return out.join(NL);
+}
+
+// 今月の実績。Cost Explorer は 1 リクエスト $0.01 の有料 API なので、
+// 誰が何回叩いても実課金が 1 時間に 1 回で済むよう S3 にキャッシュする。
+async function costThisMonth(fx) {
   let ce = null;
   let ageMin = 0;
+
   try {
     const r = await s3.send(new GetObjectCommand({ Bucket: BUCKET, Key: COST_CACHE_KEY }));
     const cached = JSON.parse(await r.Body.transformToString());
@@ -505,83 +525,75 @@ async function doCost() {
     }
   }
 
-  if (ce) {
-    const total = Object.values(ce.by_service).reduce((a, b) => a + b, 0);
-    const freshness = ageMin > 0 ? `${ageMin} 分前の取得` : "たった今取得";
-    out.push(`**今月の実績** (${ce.month_start} 〜 / ${freshness})`);
-    out.push("```");
-    for (const [name, amt] of Object.entries(ce.by_service).sort((a, b) => b[1] - a[1])) {
-      if (amt < 0.005) continue;
-      out.push(`  ${shortServiceName(name)}: ${yen(amt, fx.rate)}`);
-    }
-    out.push("  ─────────────────");
-    out.push(`  合計: ${yen(total, fx.rate)}  ($${total.toFixed(2)})`);
-    out.push("```");
-  } else {
-    out.push("**今月の実績**: 取得できませんでした");
-    out.push("（Cost Explorer が未有効か、Lambda にモジュールが同梱されていません。README のトラブルシュート参照）");
+  if (!ce) {
+    return [
+      "**今月の実績**: 取得できませんでした",
+      "（Cost Explorer が未有効か、Lambda にモジュールが同梱されていません。README のトラブルシュート参照）",
+    ];
   }
 
-  // --- [B] このセッション ---------------------------------------------------
-  // 上の「今月の実績」と対になる。Cost Explorer の遅延を受けないので、
-  // 今まさに遊んでいるぶんがいくらかを即時に出せる。
-  out.push("");
+  const total = Object.values(ce.by_service).reduce((a, b) => a + b, 0);
+  const freshness = ageMin > 0 ? `${ageMin} 分前の取得` : "たった今取得";
+  const lines = [`**今月の実績** (${ce.month_start} 〜 / ${freshness})`, "```"];
+  for (const [name, amt] of Object.entries(ce.by_service).sort((a, b) => b[1] - a[1])) {
+    if (amt < 0.005) continue;
+    lines.push(`  ${shortServiceName(name)}: ${yen(amt, fx.rate)}`);
+  }
+  lines.push("  ─────────────────");
+  lines.push(`  合計: ${yen(total, fx.rate)}  ($${total.toFixed(2)})`);
+  lines.push("```");
+  return lines;
+}
+
+// 今の起動でここまでいくら使ったか。Cost Explorer の遅延を受けないので即時に出せる。
+async function costThisSession(fx) {
   const g = await getAsg();
   const inst = g.Instances.find((i) => i.LifecycleState === "InService");
 
   if (!inst) {
-    // 停止中は「セッション」が存在しないので見出しを出し分ける
-    out.push("**現在の状態**");
-    out.push("💤 停止中 — EC2 の課金は発生していません");
-    out.push("（停止中の負担は S3 と Route 53 のみ = 月 $1 未満）");
-  } else {
-    out.push("**このセッション**");
-    const d = await ec2.send(new DescribeInstancesCommand({ InstanceIds: [inst.InstanceId] }));
-    const i = d.Reservations[0].Instances[0];
-
-    let spot = 0;
-    try {
-      const sp = await ec2.send(
-        new DescribeSpotPriceHistoryCommand({
-          InstanceTypes: [i.InstanceType],
-          ProductDescriptions: ["Linux/UNIX"],
-          AvailabilityZone: i.Placement.AvailabilityZone,
-          MaxResults: 1,
-        }),
-      );
-      spot = parseFloat(sp.SpotPriceHistory?.[0]?.SpotPrice ?? "0");
-    } catch {
-      // 価格が引けなくても稼働情報は出す
-    }
-
-    const ebsIp = (0.096 * 40) / 730 + 0.005; // gp3 40GB の時間割 + パブリック IPv4
-    const hourly = spot + ebsIp;
-    const upH = (Date.now() - new Date(i.LaunchTime).getTime()) / 3600000;
-
-    out.push(`🎮 稼働中: ${i.InstanceType} (${i.Placement.AvailabilityZone})`);
-    out.push("```");
-    out.push(`  スポット価格   ${yen(spot, fx.rate)}/時`);
-    out.push(`  EBS + IPv4     ${yen(ebsIp, fx.rate)}/時`);
-    out.push(`  稼働時間       ${Math.floor(upH)}時間${Math.floor((upH % 1) * 60)}分`);
-    out.push("  ─────────────────");
-    // 合計は時間単価ではなく「この起動で実際にいくら使ったか」。
-    // 単価は上の内訳で示しているので、ここで繰り返すとノイズになる。
-    out.push(`  合計           ${yen(hourly * upH, fx.rate)}`);
-    out.push("```");
+    // 停止中は「セッション」が存在しないので見出しを出し分ける。
+    return [
+      "**現在の状態**",
+      "💤 停止中 — EC2 の課金は発生していません",
+      "（停止中の負担は S3 と Route 53 のみ = 月 $1 未満）",
+    ];
   }
 
-  // --- 注記はまとめて末尾に置く（本文の途中に挟むと読みが途切れるため）---
-  // 実装の都合（Cost Explorer 由来など）は書かない。利用者に伝わらないうえ、
-  // 知っても行動が変わらないため。「反映が遅れる」ことだけ伝われば十分。
-  out.push("");
-  if (ce) out.push("_※ 今月の実績は反映が半日〜1 日遅れます_");
-  out.push(
-    fx.exact
-      ? `_※ 参考為替: $1 = ¥${fx.rate.toFixed(1)}_`
-      : `_※ 参考為替: $1 = ¥${fx.rate}（レート取得に失敗したため概算）_`,
-  );
+  const d = await ec2.send(new DescribeInstancesCommand({ InstanceIds: [inst.InstanceId] }));
+  const i = d.Reservations[0].Instances[0];
 
-  return out.join("\n");
+  let spot = 0;
+  try {
+    const sp = await ec2.send(
+      new DescribeSpotPriceHistoryCommand({
+        InstanceTypes: [i.InstanceType],
+        ProductDescriptions: ["Linux/UNIX"],
+        AvailabilityZone: i.Placement.AvailabilityZone,
+        MaxResults: 1,
+      }),
+    );
+    spot = parseFloat(sp.SpotPriceHistory?.[0]?.SpotPrice ?? "0");
+  } catch {
+    // 価格が引けなくても稼働情報は出す
+  }
+
+  const ebsIp = (0.096 * ROOT_VOLUME_GB) / 730 + IPV4_PER_HOUR;
+  const hourly = spot + ebsIp;
+  const upH = (Date.now() - new Date(i.LaunchTime).getTime()) / 3600000;
+
+  return [
+    "**このセッション**",
+    `🎮 稼働中: ${i.InstanceType} (${i.Placement.AvailabilityZone})`,
+    "```",
+    `  スポット価格   ${yen(spot, fx.rate)}/時`,
+    `  EBS + IPv4     ${yen(ebsIp, fx.rate)}/時`,
+    `  稼働時間       ${Math.floor(upH)}時間${Math.floor((upH % 1) * 60)}分`,
+    "  ─────────────────",
+    // 合計は時間単価ではなく「この起動で実際にいくら使ったか」。
+    // 単価は上の内訳で示しているので、ここで繰り返すとノイズになる。
+    `  合計           ${yen(hourly * upH, fx.rate)}`,
+    "```",
+  ];
 }
 
 async function fetchCostExplorer() {
@@ -702,3 +714,6 @@ async function sendWebhook(title, description, color) {
 }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Discord のメッセージは行区切りで組み立てる。
+const NL = "\n";

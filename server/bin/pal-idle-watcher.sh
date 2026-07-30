@@ -19,16 +19,15 @@ while true; do
   sleep 60
   [ -f "$STATE_DIR/stopped" ] && exit 0
 
-  # ShowPlayers はヘッダ行 "name,playeruid,steamid" + 1 人 1 行。
-  PLAYERS=$(rcon "ShowPlayers" 2>/dev/null || echo "__RCON_FAIL__")
-  if [ "$PLAYERS" = "__RCON_FAIL__" ]; then
+  COUNT=$(player_count || true)
+  if [ "$COUNT" = "unknown" ]; then
     # RCON 不調では停止しない (誰か遊んでいる最中に落とすのが最悪のため)。
+    # カウンタもリセットして、応答が戻ってから数え直す。
     log "WARN: rcon unreachable; skipping idle check"
     IDLE_SINCE=0
     continue
   fi
 
-  COUNT=$(echo "$PLAYERS" | tail -n +2 | sed '/^\s*$/d' | wc -l)
   echo "$COUNT" > "$STATE_DIR/player-count"
 
   if [ "$COUNT" -gt 0 ]; then

@@ -32,8 +32,7 @@ echo steam steam/license note '' | debconf-set-selections
 # steamcmd は Ubuntu では i386 パッケージのみ。
 apt-get install -y -qq zstd curl jq >/dev/null
 apt-get install -y -qq steamcmd:i386 >/dev/null || apt-get install -y -qq steamcmd >/dev/null
-
-STEAMCMD=/usr/games/steamcmd
+# STEAMCMD のパスは common.sh が定義している (更新スクリプトと共有するため)。
 
 # ---------------------------------------------------------------------------
 # 2. Route53 UPSERT (TTL 60 — 復帰時の再接続を成立させる必須条件)
@@ -97,7 +96,8 @@ chown -R palworld:palworld "$PAL_HOME"
 
 # PalServer.sh が要求する steamclient.so (64bit) を配置。
 sudo -u palworld mkdir -p /home/palworld/.steam/sdk64
-for so in /home/palworld/Steam/linux64/steamclient.so           /home/palworld/.local/share/Steam/steamcmd/linux64/steamclient.so; do
+for so in /home/palworld/Steam/linux64/steamclient.so \
+          /home/palworld/.local/share/Steam/steamcmd/linux64/steamclient.so; do
   if [ -f "$so" ]; then
     sudo -u palworld cp "$so" /home/palworld/.steam/sdk64/steamclient.so
     break
@@ -106,7 +106,8 @@ done
 if [ ! -f /home/palworld/.steam/sdk64/steamclient.so ]; then
   # 最終手段: Steamworks SDK Redist (appid 1007) から取得する。
   sudo -u palworld HOME=/home/palworld "$STEAMCMD" +login anonymous +app_update 1007 +quit >/dev/null || true
-  sudo -u palworld cp "/home/palworld/Steam/steamapps/common/Steamworks SDK Redist/linux64/steamclient.so"     /home/palworld/.steam/sdk64/steamclient.so 2>/dev/null || true
+  sudo -u palworld cp "/home/palworld/Steam/steamapps/common/Steamworks SDK Redist/linux64/steamclient.so" \
+    /home/palworld/.steam/sdk64/steamclient.so 2>/dev/null || true
 fi
 
 # ---------------------------------------------------------------------------
