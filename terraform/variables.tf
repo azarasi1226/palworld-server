@@ -132,17 +132,14 @@ variable "instance_types" {
   EOT
   type        = list(string)
   default = [
-    "m7i.xlarge",  # 4vCPU / 16GB
-    "m7a.xlarge",  # 4vCPU / 16GB
-    "m6i.xlarge",  # 4vCPU / 16GB
-    "m6a.xlarge",  # 4vCPU / 16GB
-    "m5.xlarge",   # 4vCPU / 16GB
-    "m5a.xlarge",  # 4vCPU / 16GB
-    "c7i.2xlarge", # 8vCPU / 16GB
-    "c6i.2xlarge", # 8vCPU / 16GB
-    "c5.2xlarge",  # 8vCPU / 16GB
-    "r6i.xlarge",  # 4vCPU / 32GB
-    "r5.xlarge",   # 4vCPU / 32GB
+    "m7i.xlarge",  # 4vCPU / 16GB / 約 ¥18/時
+    "m7a.xlarge",  # 4vCPU / 16GB / 約 ¥17/時
+    "m6i.xlarge",  # 4vCPU / 16GB / 約 ¥16/時
+    "m6a.xlarge",  # 4vCPU / 16GB / 約 ¥17/時
+    "m5.xlarge",   # 4vCPU / 16GB / 約 ¥13/時 (最安)
+    "m5a.xlarge",  # 4vCPU / 16GB / 約 ¥18/時
+    "r6i.xlarge",  # 4vCPU / 32GB / 約 ¥20/時
+    "r5.xlarge",   # 4vCPU / 32GB / 約 ¥17/時
   ]
 }
 
