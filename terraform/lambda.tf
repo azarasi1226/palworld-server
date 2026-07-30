@@ -96,17 +96,12 @@ resource "aws_lambda_permission" "apigateway" {
 #   │      ↓                     │──呼出─▶│ 「この ARN からの呼び出しを │
 #   │ event_target どこへ送るか   │      │   受け付ける」              │
 #   └────────────────────────────┘      └────────────────────────────┘
+#
+# スポット中断 (EC2 Spot Instance Interruption Warning) はここでは受けない。
+# 同じ事実をインスタンス側の guardian が IMDS で検知して通知するため、
+# 常に 2 通並ぶだけだった (実測でも毎回重複)。しかも Lambda 側は通知しか行わず、
+# セーブや停止を決めているのはインスタンスだけなので、消しても動作は変わらない。
 # ---------------------------------------------------------------------------
-
-resource "aws_cloudwatch_event_rule" "spot_interruption" {
-  name        = "${local.name}-spot-interruption"
-  description = "Spot 中断警告を Discord へ通知 (インスタンス側通知が飛ばない場合の保険)"
-
-  event_pattern = jsonencode({
-    source      = ["aws.ec2"]
-    detail-type = ["EC2 Spot Instance Interruption Warning"]
-  })
-}
 
 resource "aws_cloudwatch_event_rule" "launch_failure" {
   name        = "${local.name}-launch-failure"
@@ -124,11 +119,6 @@ resource "aws_cloudwatch_event_rule" "launch_failure" {
 # --- 送る側: どのルールが発火したら、どこへ配送するか ---
 # arn に指定した Lambda が配送先になる。
 
-resource "aws_cloudwatch_event_target" "spot_interruption" {
-  rule = aws_cloudwatch_event_rule.spot_interruption.name
-  arn  = aws_lambda_function.discord.arn
-}
-
 resource "aws_cloudwatch_event_target" "launch_failure" {
   rule = aws_cloudwatch_event_rule.launch_failure.name
   arn  = aws_lambda_function.discord.arn
@@ -136,14 +126,6 @@ resource "aws_cloudwatch_event_target" "launch_failure" {
 
 # --- 受ける側: Lambda が「このルールからの呼び出しを受け入れる」と宣言する ---
 # 上の target とペアで機能する。詳細はこのセクション冒頭のコメント参照。
-
-resource "aws_lambda_permission" "eventbridge_spot" {
-  statement_id  = "AllowSpotInterruptionEvent"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.discord.function_name
-  principal     = "events.amazonaws.com"
-  source_arn    = aws_cloudwatch_event_rule.spot_interruption.arn
-}
 
 resource "aws_lambda_permission" "eventbridge_launch" {
   statement_id  = "AllowLaunchFailureEvent"

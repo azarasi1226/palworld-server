@@ -659,19 +659,11 @@ function shortServiceName(name) {
 
 let lastLaunchFailureNotify = 0; // warm コンテナ内のベストエフォート抑制
 
+// スポット中断イベントはここでは受けない (EventBridge ルール自体を作っていない)。
+// 同じ事実をインスタンス側の guardian が IMDS で検知して通知するため、
+// 通知が 2 通並ぶだけだった。Lambda 側は通知しかしておらず、セーブ・停止を
+// 決めているのはインスタンスだけなので、消しても挙動は変わらない。
 async function handleAwsEvent(event) {
-  if (event["detail-type"] === "EC2 Spot Instance Interruption Warning") {
-    // アカウント内の他のスポットにも反応するため、自分の ASG のインスタンスか確認する。
-    const iid = event.detail?.["instance-id"];
-    if (!(await isOurInstance(iid))) return;
-    await sendWebhook(
-      "⚠️ スポット中断の通知を受信しました (AWS 側検知)",
-      `インスタンス ${iid} が約 2 分後に回収されます。\nサーバー側の緊急セーブが並行して動いています。セーブ完了通知が続かない場合、直前の定期バックアップ (最大 5 分前) まで巻き戻る可能性があります。`,
-      0xffcc4d,
-    );
-    return;
-  }
-
   if (event["detail-type"] === "EC2 Instance Launch Unsuccessful") {
     const now = Date.now();
     if (now - lastLaunchFailureNotify < 10 * 60 * 1000) return; // 連投抑制
@@ -681,19 +673,6 @@ async function handleAwsEvent(event) {
       `スポットキャパシティ不足の可能性があります。自動でリトライが続きます。\n復旧しない場合は時間をおいて \`/pal stop\` → \`/pal start\` を試すか、README のオンデマンド切替手順を参照してください。\n詳細: ${event.detail?.StatusMessage ?? "不明"}`,
       0xed4245,
     );
-  }
-}
-
-async function isOurInstance(instanceId) {
-  if (!instanceId) return false;
-  try {
-    const res = await ec2.send(new DescribeInstancesCommand({ InstanceIds: [instanceId] }));
-    const tags = res.Reservations?.[0]?.Instances?.[0]?.Tags ?? [];
-    return tags.some(
-      (t) => t.Key === "aws:autoscaling:groupName" && t.Value === ASG_NAME,
-    );
-  } catch {
-    return false;
   }
 }
 
