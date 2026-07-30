@@ -1,10 +1,10 @@
 <mxfile host="65bd71144e">
     <diagram name="起動シーケンス" id="boot-sequence">
-        <mxGraphModel dx="1273" dy="577" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1500" pageHeight="1150" math="0" shadow="0">
+        <mxGraphModel dx="1273" dy="577" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1500" pageHeight="1260" math="0" shadow="0">
             <root>
                 <mxCell id="0"/>
                 <mxCell id="1" parent="0"/>
-                <mxCell id="btitle" value="起動シーケンス  ―  /pal start から接続可能まで（通常 2〜3 分 / 初回 6〜8 分）" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=18;fontStyle=1;fontColor=#232F3E;" parent="1" vertex="1">
+                <mxCell id="btitle" value="起動シーケンス  ―  /pal start から接続可能まで（通常 約 2 分 / 初回 3〜5 分）　※ここでゲームの更新は行わない" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=18;fontStyle=1;fontColor=#232F3E;" parent="1" vertex="1">
                     <mxGeometry x="40" y="20" width="900" height="40" as="geometry"/>
                 </mxCell>
                 <mxCell id="bl1" value="Discord" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#5865F2;strokeColor=none;fontColor=#ffffff;fontSize=12;fontStyle=1;" parent="1" vertex="1">
@@ -28,37 +28,37 @@
                 <mxCell id="bll1" value="" style="endArrow=none;dashed=1;html=1;strokeColor=#B0B0B0;" parent="1" edge="1">
                     <mxGeometry relative="1" as="geometry">
                         <mxPoint x="125" y="120" as="sourcePoint"/>
-                        <mxPoint x="125" y="1090" as="targetPoint"/>
+                        <mxPoint x="125" y="1200" as="targetPoint"/>
                     </mxGeometry>
                 </mxCell>
                 <mxCell id="bll2" value="" style="endArrow=none;dashed=1;html=1;strokeColor=#B0B0B0;" parent="1" edge="1">
                     <mxGeometry relative="1" as="geometry">
                         <mxPoint x="315" y="120" as="sourcePoint"/>
-                        <mxPoint x="315" y="1090" as="targetPoint"/>
+                        <mxPoint x="315" y="1200" as="targetPoint"/>
                     </mxGeometry>
                 </mxCell>
                 <mxCell id="bll3" value="" style="endArrow=none;dashed=1;html=1;strokeColor=#B0B0B0;" parent="1" edge="1">
                     <mxGeometry relative="1" as="geometry">
                         <mxPoint x="505" y="120" as="sourcePoint"/>
-                        <mxPoint x="505" y="1090" as="targetPoint"/>
+                        <mxPoint x="505" y="1200" as="targetPoint"/>
                     </mxGeometry>
                 </mxCell>
                 <mxCell id="bll4" value="" style="endArrow=none;dashed=1;html=1;strokeColor=#B0B0B0;" parent="1" edge="1">
                     <mxGeometry relative="1" as="geometry">
                         <mxPoint x="730" y="120" as="sourcePoint"/>
-                        <mxPoint x="730" y="1090" as="targetPoint"/>
+                        <mxPoint x="730" y="1200" as="targetPoint"/>
                     </mxGeometry>
                 </mxCell>
                 <mxCell id="bll5" value="" style="endArrow=none;dashed=1;html=1;strokeColor=#B0B0B0;" parent="1" edge="1">
                     <mxGeometry relative="1" as="geometry">
                         <mxPoint x="965" y="120" as="sourcePoint"/>
-                        <mxPoint x="965" y="1090" as="targetPoint"/>
+                        <mxPoint x="965" y="1200" as="targetPoint"/>
                     </mxGeometry>
                 </mxCell>
                 <mxCell id="bll6" value="" style="endArrow=none;dashed=1;html=1;strokeColor=#B0B0B0;" parent="1" edge="1">
                     <mxGeometry relative="1" as="geometry">
                         <mxPoint x="1165" y="120" as="sourcePoint"/>
-                        <mxPoint x="1165" y="1090" as="targetPoint"/>
+                        <mxPoint x="1165" y="1200" as="targetPoint"/>
                     </mxGeometry>
                 </mxCell>
                 <mxCell id="b1" value="/pal start" style="html=1;verticalAlign=bottom;endArrow=block;strokeColor=#5865F2;strokeWidth=2;fontSize=11;" parent="1" edge="1">
@@ -109,16 +109,16 @@
                         <mxPoint x="1165" y="535" as="targetPoint"/>
                     </mxGeometry>
                 </mxCell>
-                <mxCell id="bphase3" value="③ ゲーム本体の用意" style="text;html=1;strokeColor=none;fillColor=#EEEEEE;align=center;verticalAlign=middle;rounded=1;fontSize=11;fontStyle=1;" parent="1" vertex="1">
+                <mxCell id="bphase3" value="③ ゲーム本体を展開（更新はしない）" style="text;html=1;strokeColor=none;fillColor=#EEEEEE;align=center;verticalAlign=middle;rounded=1;fontSize=11;fontStyle=1;" parent="1" vertex="1">
                     <mxGeometry x="600" y="560" width="260" height="26" as="geometry"/>
                 </mxCell>
-                <mxCell id="b7" value="gamecache/palserver.tar.zst を展開" style="html=1;verticalAlign=bottom;endArrow=block;dashed=1;strokeColor=#277116;strokeWidth=2;fontSize=11;" parent="1" edge="1">
+                <mxCell id="b7" value="gamecache/palserver.tar.zst を展開（更新なし）" style="html=1;verticalAlign=bottom;endArrow=block;dashed=1;strokeColor=#277116;strokeWidth=2;fontSize=11;" parent="1" edge="1">
                     <mxGeometry relative="1" as="geometry">
                         <mxPoint x="965" y="615" as="sourcePoint"/>
                         <mxPoint x="730" y="615" as="targetPoint"/>
                     </mxGeometry>
                 </mxCell>
-                <mxCell id="bnote3" value="キャッシュが無ければ steamcmd でフル取得（初回のみ 5〜8 分）。&#xa;取得後 buildid が変わっていれば裏でキャッシュを作り直す。" style="text;html=1;strokeColor=#999999;fillColor=#FAFAFA;align=left;verticalAlign=middle;rounded=1;fontSize=10;spacing=6;" parent="1" vertex="1">
+                <mxCell id="bnote3" value="キャッシュを展開するだけ。更新は /pal update の担当なので、&#xa;Steam 側の障害や更新の失敗が起動を妨げることがない。&#xa;キャッシュが無い場合のみ steamcmd で取得（3〜5 分）。" style="text;html=1;strokeColor=#999999;fillColor=#FAFAFA;align=left;verticalAlign=middle;rounded=1;fontSize=10;spacing=6;" parent="1" vertex="1">
                     <mxGeometry x="600" y="630" width="360" height="40" as="geometry"/>
                 </mxCell>
                 <mxCell id="bphase4" value="④ セーブ復元　★ここが最重要" style="text;html=1;strokeColor=#B85450;fillColor=#F8CECC;align=center;verticalAlign=middle;rounded=1;fontSize=11;fontStyle=1;" parent="1" vertex="1">
@@ -153,6 +153,12 @@
                 </mxCell>
                 <mxCell id="bnote6" value="PalWorldSettings.ini を tfvars の値から生成（セーブには含めない）&#xa;→ palworld / pal-guardian / pal-idle / backup.timer / status.timer を enable" style="text;html=1;strokeColor=#999999;fillColor=#FAFAFA;align=left;verticalAlign=middle;rounded=1;fontSize=10;spacing=6;" parent="1" vertex="1">
                     <mxGeometry x="580" y="975" width="400" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="bphase6" value="⑥ 後処理（起動を待たせない）" style="text;html=1;strokeColor=none;fillColor=#EEEEEE;align=center;verticalAlign=middle;rounded=1;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+                    <mxGeometry x="600" y="1090" width="260" height="26" as="geometry"/>
+                </mxCell>
+                <mxCell id="bnote7" value="pal-post-boot.sh を systemd-run で切り離して起動。&#xa;・キャッシュが古ければ作り直す&#xa;・Steam に問い合わせ、更新があれば通知（適用はしない）&#xa;install.sh の中で &amp; で流すと cloud-init の終了に巻き込まれるため独立させる。" style="text;html=1;strokeColor=#999999;fillColor=#FAFAFA;align=left;verticalAlign=middle;rounded=1;fontSize=10;spacing=6;" vertex="1" parent="1">
+                    <mxGeometry x="560" y="1122" width="420" height="52" as="geometry"/>
                 </mxCell>
                 <mxCell id="b11" value="RCON が応答するまで最大 300 秒待機 → 「🎮 サーバーが起動しました」" style="html=1;verticalAlign=bottom;endArrow=block;dashed=1;strokeColor=#5865F2;strokeWidth=2;fontSize=11;" parent="1" edge="1">
                     <mxGeometry relative="1" as="geometry">
@@ -655,6 +661,86 @@
                 <mxCell id="pend" value="&lt;b&gt;このあと&lt;/b&gt;　新しいインスタンスが S3 からセーブを復元し、Route 53 を自分の IP に更新する。プレイヤーは数分待って同じアドレスに再接続するだけでよい。&#xa;なお AWS 都合の置換（ヘルスチェック起因など）も desired = 1 のままなので、この図と同じ経路をたどる（通知の【原因】表示だけが変わる）。" style="text;html=1;strokeColor=#82B366;fillColor=#D5E8D4;align=left;verticalAlign=middle;rounded=1;fontSize=11;spacing=8;" parent="1" vertex="1">
                     <mxGeometry x="40" y="960" width="1150" height="46" as="geometry"/>
                 </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+    <diagram name="更新（/pal update）" id="update-sequence">
+        <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="1060" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+
+                <mxCell id="utitle" value="更新シーケンス  ―  /pal update でゲーム本体を差し替える" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=18;fontStyle=1;fontColor=#232F3E;" vertex="1" parent="1">
+                    <mxGeometry x="40" y="20" width="900" height="34" as="geometry"/>
+                </mxCell>
+                <mxCell id="usub" value="起動処理からは分離されている。更新の失敗が起動の失敗になるのを避け、意図しないタイミングでバージョンが上がるのを防ぐため" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=12;fontStyle=2;fontColor=#666666;" vertex="1" parent="1">
+                    <mxGeometry x="40" y="54" width="1200" height="24" as="geometry"/>
+                </mxCell>
+
+                <mxCell id="uh1" value="Discord" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#5865F2;strokeColor=none;fontColor=#ffffff;fontSize=12;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="60" y="100" width="120" height="40" as="geometry"/></mxCell>
+                <mxCell id="uh2" value="Lambda" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D05C17;strokeColor=none;fontColor=#ffffff;fontSize=12;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="240" y="100" width="120" height="40" as="geometry"/></mxCell>
+                <mxCell id="uh3" value="pal-update.sh" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#232F3E;strokeColor=none;fontColor=#ffffff;fontSize=12;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="430" y="100" width="140" height="40" as="geometry"/></mxCell>
+                <mxCell id="uh4" value="PalServer&#xa;(RCON)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#8C4FFF;strokeColor=none;fontColor=#ffffff;fontSize=12;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="650" y="100" width="120" height="40" as="geometry"/></mxCell>
+                <mxCell id="uh5" value="Steam" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1B2838;strokeColor=none;fontColor=#ffffff;fontSize=12;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="850" y="100" width="120" height="40" as="geometry"/></mxCell>
+                <mxCell id="uh6" value="S3" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#277116;strokeColor=none;fontColor=#ffffff;fontSize=12;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="1050" y="100" width="120" height="40" as="geometry"/></mxCell>
+
+                <mxCell id="ull1" style="endArrow=none;dashed=1;html=1;strokeColor=#B0B0B0;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="120" y="140" as="sourcePoint"/><mxPoint x="120" y="980" as="targetPoint"/></mxGeometry></mxCell>
+                <mxCell id="ull2" style="endArrow=none;dashed=1;html=1;strokeColor=#B0B0B0;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="300" y="140" as="sourcePoint"/><mxPoint x="300" y="980" as="targetPoint"/></mxGeometry></mxCell>
+                <mxCell id="ull3" style="endArrow=none;dashed=1;html=1;strokeColor=#B0B0B0;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="500" y="140" as="sourcePoint"/><mxPoint x="500" y="980" as="targetPoint"/></mxGeometry></mxCell>
+                <mxCell id="ull4" style="endArrow=none;dashed=1;html=1;strokeColor=#B0B0B0;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="710" y="140" as="sourcePoint"/><mxPoint x="710" y="980" as="targetPoint"/></mxGeometry></mxCell>
+                <mxCell id="ull5" style="endArrow=none;dashed=1;html=1;strokeColor=#B0B0B0;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="910" y="140" as="sourcePoint"/><mxPoint x="910" y="980" as="targetPoint"/></mxGeometry></mxCell>
+                <mxCell id="ull6" style="endArrow=none;dashed=1;html=1;strokeColor=#B0B0B0;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1110" y="140" as="sourcePoint"/><mxPoint x="1110" y="980" as="targetPoint"/></mxGeometry></mxCell>
+
+                <mxCell id="up1" value="前提の確認 ─ 通らなければ何も変更せずに中止する" style="text;html=1;strokeColor=#D6B656;fillColor=#FFF2CC;align=left;verticalAlign=middle;rounded=1;fontSize=11;fontStyle=1;spacing=8;" vertex="1" parent="1">
+                    <mxGeometry x="40" y="165" width="1210" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="ua1" value="/pal update" style="html=1;verticalAlign=bottom;endArrow=block;strokeColor=#5865F2;strokeWidth=2;fontSize=11;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="120" y="215" as="sourcePoint"/><mxPoint x="300" y="215" as="targetPoint"/></mxGeometry></mxCell>
+                <mxCell id="ua2" value="停止中なら「先に /pal start」／status.json で接続者を予備チェック" style="text;html=1;strokeColor=#999999;fillColor=#FAFAFA;align=left;verticalAlign=middle;rounded=1;fontSize=10;spacing=6;" vertex="1" parent="1">
+                    <mxGeometry x="200" y="228" width="400" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="ua3" value="SSM RunCommand で実行" style="html=1;verticalAlign=bottom;endArrow=block;strokeColor=#232F3E;strokeWidth=2;fontSize=11;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="300" y="285" as="sourcePoint"/><mxPoint x="500" y="285" as="targetPoint"/></mxGeometry></mxCell>
+                <mxCell id="ua4" value="ShowPlayers（実測）" style="html=1;verticalAlign=bottom;endArrow=block;strokeColor=#8C4FFF;strokeWidth=2;fontSize=11;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="500" y="325" as="sourcePoint"/><mxPoint x="710" y="325" as="targetPoint"/></mxGeometry></mxCell>
+                <mxCell id="ua5" value="接続者がいれば中止 ─ 通知チャンネルとゲーム内 Broadcast の両方で伝える。&#xa;Lambda が見る status.json は最大 30 秒古いため、ここが最終判定になる。" style="text;html=1;strokeColor=#D6B656;fillColor=#FFF2CC;align=left;verticalAlign=middle;rounded=1;fontSize=10;spacing=6;" vertex="1" parent="1">
+                    <mxGeometry x="420" y="340" width="470" height="36" as="geometry"/>
+                </mxCell>
+                <mxCell id="ua6" value="最新 buildid を問い合わせ（ダウンロードなし）" style="html=1;verticalAlign=bottom;endArrow=block;strokeColor=#66A0C8;strokeWidth=2;fontSize=11;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="500" y="405" as="sourcePoint"/><mxPoint x="910" y="405" as="targetPoint"/></mxGeometry></mxCell>
+                <mxCell id="ua7" value="同じなら「すでに最新版です」で終了" style="text;html=1;strokeColor=#999999;fillColor=#FAFAFA;align=left;verticalAlign=middle;rounded=1;fontSize=10;spacing=6;" vertex="1" parent="1">
+                    <mxGeometry x="520" y="418" width="270" height="24" as="geometry"/>
+                </mxCell>
+
+                <mxCell id="up2" value="更新前の退避 ─ ここが失敗したら更新しない　★セーブを守る判断" style="text;html=1;strokeColor=#B85450;fillColor=#F8CECC;align=left;verticalAlign=middle;rounded=1;fontSize=11;fontStyle=1;spacing=8;" vertex="1" parent="1">
+                    <mxGeometry x="40" y="460" width="1210" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="ub1" value="Broadcast → Save" style="html=1;verticalAlign=bottom;endArrow=block;strokeColor=#8C4FFF;strokeWidth=2;fontSize=11;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="500" y="510" as="sourcePoint"/><mxPoint x="710" y="510" as="targetPoint"/></mxGeometry></mxCell>
+                <mxCell id="ub2" value="saves/latest.tar.zst を更新 →&#xa;saves/archive/pre-update-&lt;旧build&gt;.tar.zst として複製（30 日保持）" style="html=1;verticalAlign=bottom;endArrow=block;strokeColor=#277116;strokeWidth=3;fontSize=11;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="500" y="555" as="sourcePoint"/><mxPoint x="1110" y="555" as="targetPoint"/></mxGeometry></mxCell>
+                <mxCell id="ub3" value="新バージョンで一度起動すると旧バージョンに戻せなくなる場合があるため、&#xa;退避できない状態では更新を進めない（サーバーはそのまま稼働させる）。" style="text;html=1;strokeColor=#B85450;fillColor=#F8CECC;align=left;verticalAlign=middle;rounded=1;fontSize=10;spacing=6;" vertex="1" parent="1">
+                    <mxGeometry x="480" y="590" width="490" height="36" as="geometry"/>
+                </mxCell>
+
+                <mxCell id="up3" value="差し替え ─ インスタンスは落とさず、ゲームプロセスだけ止める" style="text;html=1;strokeColor=none;fillColor=#EEEEEE;align=left;verticalAlign=middle;rounded=1;fontSize=11;fontStyle=1;spacing=8;" vertex="1" parent="1">
+                    <mxGeometry x="40" y="645" width="1210" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="uc1" value="systemctl stop palworld" style="html=1;verticalAlign=bottom;endArrow=block;strokeColor=#8C4FFF;strokeWidth=2;fontSize=11;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="500" y="695" as="sourcePoint"/><mxPoint x="710" y="695" as="targetPoint"/></mxGeometry></mxCell>
+                <mxCell id="uc2" value="steamcmd app_update（validate 付き）" style="html=1;verticalAlign=bottom;endArrow=block;strokeColor=#66A0C8;strokeWidth=3;fontSize=11;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="500" y="735" as="sourcePoint"/><mxPoint x="910" y="735" as="targetPoint"/></mxGeometry></mxCell>
+                <mxCell id="uc3" value="成否は終了コードではなく PalServer.sh と buildid の実体で判定する&#xa;（steamcmd は成功時でも 0 以外を返すことがある）" style="text;html=1;strokeColor=#999999;fillColor=#FAFAFA;align=left;verticalAlign=middle;rounded=1;fontSize=10;spacing=6;" vertex="1" parent="1">
+                    <mxGeometry x="480" y="750" width="450" height="36" as="geometry"/>
+                </mxCell>
+                <mxCell id="uc4" value="systemctl start palworld" style="html=1;verticalAlign=bottom;endArrow=block;strokeColor=#8C4FFF;strokeWidth=2;fontSize=11;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="500" y="805" as="sourcePoint"/><mxPoint x="710" y="805" as="targetPoint"/></mxGeometry></mxCell>
+
+                <mxCell id="up4" value="後始末と報告" style="text;html=1;strokeColor=none;fillColor=#EEEEEE;align=left;verticalAlign=middle;rounded=1;fontSize=11;fontStyle=1;spacing=8;" vertex="1" parent="1">
+                    <mxGeometry x="40" y="835" width="1210" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="ud1" value="pal-post-boot.sh を systemd-run で起動 → 新バージョンでキャッシュを作り直す" style="html=1;verticalAlign=bottom;endArrow=block;strokeColor=#277116;strokeWidth=3;fontSize=11;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="500" y="885" as="sourcePoint"/><mxPoint x="1110" y="885" as="targetPoint"/></mxGeometry></mxCell>
+                <mxCell id="ud2" value="ここでキャッシュを更新しないと、次の起動で古い版が展開されてしまう" style="text;html=1;strokeColor=#82B366;fillColor=#F2FBEF;align=left;verticalAlign=middle;rounded=1;fontSize=10;spacing=6;" vertex="1" parent="1">
+                    <mxGeometry x="560" y="900" width="480" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="ud3" value="UPDATE_RESULT: updated &lt;旧&gt; &lt;新&gt;（標準出力）" style="html=1;verticalAlign=bottom;endArrow=block;dashed=1;strokeColor=#232F3E;strokeWidth=2;fontSize=11;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="500" y="950" as="sourcePoint"/><mxPoint x="300" y="950" as="targetPoint"/></mxGeometry></mxCell>
+                <mxCell id="ud4" value="✅ 更新が完了しました" style="html=1;verticalAlign=bottom;endArrow=block;dashed=1;strokeColor=#5865F2;strokeWidth=2;fontSize=11;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="300" y="975" as="sourcePoint"/><mxPoint x="120" y="975" as="targetPoint"/></mxGeometry></mxCell>
+
+                <mxCell id="unote" value="&lt;b&gt;なぜ SSM 経由なのか&lt;/b&gt;　Lambda は VPC の外にいて EC2 と直接通信できない。そこで SSM に実行を依頼し、結果は標準出力の &lt;code&gt;UPDATE_RESULT:&lt;/code&gt; 行で受け取る。&#xa;&lt;b&gt;なぜ停止中に更新できないのか&lt;/b&gt;　停止 = インスタンスごと終了しており、steamcmd を走らせる機械が存在しないため。先に /pal start が必要。" style="text;html=1;strokeColor=#6C8EBF;fillColor=#DAE8FC;align=left;verticalAlign=middle;rounded=1;fontSize=11;spacing=8;" vertex="1" parent="1">
+                    <mxGeometry x="40" y="1000" width="1210" height="46" as="geometry"/>
+                </mxCell>
+
             </root>
         </mxGraphModel>
     </diagram>

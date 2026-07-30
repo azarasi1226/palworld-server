@@ -11,16 +11,24 @@ EC2 インスタンスの中で何が動いているかの一覧。
 
 | スクリプト | 種別 | 動き方 | 何をしているか |
 | --- | --- | --- | --- |
-| `install.sh` | 起動時 1 回 | user_data から `exec` | OS 準備・DNS 登録・ゲーム取得・セーブ復元・systemd 起動 |
+| `install.sh` | 起動時 1 回 | user_data から `exec` | OS 準備・DNS 登録・ゲーム展開・セーブ復元・systemd 起動 |
 | `pal-guardian.sh` | **常駐** | 5 秒（スポット回収）/ 15 秒（ASG 終了指示） | 終了の兆候を見張り、掴んだら緊急セーブへ入る |
 | `pal-idle-watcher.sh` | **常駐** | 60 秒でポーリング | 接続人数を数え、15 分無人なら自動停止する |
 | `pal-backup.sh` | 定期実行 | タイマーが 5 分ごとに起動 | セーブを検証して S3 へ退避する |
 | `pal-status.sh` | 定期実行 | タイマーが 30 秒ごとに起動 | 状態を S3 へ発行し、排他ロックの心拍を打つ |
 | `pal-restore.sh` | 起動時 1 回 | install.sh から呼ばれる | S3 からセーブを復元し、開くワールドを指定する |
+| `pal-post-boot.sh` | 起動後 1 回 | `systemd-run` で切り離して起動 | ゲームのキャッシュを作り、更新の有無を通知する |
 | `pal-graceful-stop.sh` | 契機ごと 1 回 | guardian / idle から呼ばれる | 原因を判定し、セーブしてから終了処理を進める |
+| `pal-update.sh` | 手動 | `/pal update` から SSM 経由 | ゲーム本体を最新版に差し替える |
 | `pal-notify.sh` | 都度 | 各スクリプトから呼ばれる | Discord の Webhook へ通知を送る |
 | `rcon.py` | 都度 | 各スクリプトから呼ばれる | ゲーム本体にコマンドを送る（Save・ShowPlayers 等） |
-| `lib/common.sh` | ライブラリ | 全スクリプトが `source` | 設定読み込み・RCON・ロック・通知の共通処理 |
+| `lib/common.sh` | ライブラリ | 全スクリプトが `source` | 設定読み込み・RCON・ロック・通知・steamcmd の共通処理 |
+
+**起動処理はゲームを更新しない。** `install.sh` は S3 のキャッシュを展開して起動するだけで、
+バージョンの差し替えは `pal-update.sh`（`/pal update`）だけが行う。分離したのは、
+更新の失敗がそのまま起動の失敗になるのを避けるためと、意図しないタイミングで
+バージョンが上がるのを防ぐため（新バージョンで一度起動すると戻せなくなる場合がある）。
+古いまま放置されないよう、`pal-post-boot.sh` が起動後に更新の有無だけを通知する。
 
 **ポーリングしているのは 2 つだけ**（guardian と idle-watcher）。
 他はタイマー起動か、必要なときに 1 回走って終わる。
@@ -119,8 +127,13 @@ CPU 使用率は `/proc/stat` の累積値を前回実行時（30 秒前）と�
 user_data から `exec` で呼ばれる構築処理の本体。約 250 行。
 
 OS 準備（steamcmd・スワップ 4GB・palworld ユーザー）→ Route53 に自 IP を登録 →
-ゲーム本体を用意（S3 キャッシュ優先、無ければ steamcmd）→ **セーブ復元** →
-`PalWorldSettings.ini` を生成 → systemd ユニットを配置して起動 → 起動完了を通知。
+ゲーム本体を用意（S3 キャッシュを展開。無ければ steamcmd で取得）→ **セーブ復元** →
+`PalWorldSettings.ini` を生成 → systemd ユニットを配置して起動 → 起動完了を通知 →
+後処理（`pal-post-boot.sh`）を切り離して起動。
+
+**ここでゲームの更新は行わない。** キャッシュを展開して起動するだけなので、
+Steam 側の障害や更新の失敗が起動を妨げることがない。バージョンの差し替えは
+`pal-update.sh` の担当。
 
 **user_data 本体（`terraform/templates/user_data.sh.tftpl`）とは別物。**
 あちらは設定を書き出して S3 からスクリプトを取ってくるだけの薄いラッパーで、
@@ -140,6 +153,50 @@ S3 からセーブを復元する。**多層防御の第 5 層**。
 4 が無いと、サーバーは復元済みワールドを無視して新規ワールドを作る
 （＝プレイヤーには「キャラクリからやり直し」に見える）。この設定ファイルは
 `SaveGames` の外にあるためバックアップ対象外で、実運用で踏んだ罠。
+
+### pal-post-boot.sh ─ 起動完了後（install.sh から切り離して）
+
+時間のかかる後処理を 2 つ行う。
+
+1. **ゲームのキャッシュを S3 へ保存** — 次回起動を速くするため。
+   S3 の `buildid.txt` と手元のバージョンが違うときだけ作り直す
+2. **更新の有無を通知** — Steam に問い合わせて（ダウンロードは発生しない）、
+   新しい版があれば知らせる。**適用はしない**
+
+`systemd-run` で独立したユニットとして起動される。install.sh の中で `&` で流すと、
+cloud-init のサービスが完了した時点で systemd に cgroup ごと後始末され、
+数分かかるキャッシュ作成が完走しない恐れがあるため。
+
+そのためログは `pal-bootstrap.log` ではなく journal に出る。
+確認は `journalctl -u pal-post-boot`。
+
+キャッシュ作成の tar は、除外している `Pal/Saved` の親（`./Pal`）の更新時刻が
+サーバー稼働で変わるため、**正常時でも終了コード 1 を返す**。これを失敗と扱うと
+キャッシュが永久に作られず、更新のたびに再インストールが走る（実際に踏んだ）。
+2 以上だけを致命的として扱い、圧縮ストリームの整合性とサイズを検証してから
+アップロードする。
+
+### pal-update.sh ─ `/pal update` から（SSM 経由）
+
+ゲーム本体を最新版に差し替える。起動処理から分離されている唯一の更新経路。
+
+```text
+1. 停止中なら断る（更新を実行する機械が存在しないため）
+2. 接続者がいれば断る → 通知チャンネルとゲーム内 Broadcast の両方で伝える
+3. セーブ → saves/archive/pre-update-<旧build>.tar.zst を作成（30 日保持）
+4. ゲームプロセスだけ停止 → steamcmd で更新 → キャッシュ再作成 → 起動
+5. 結果を通知
+```
+
+**バックアップに失敗したら更新しない。** 新バージョンで一度起動すると旧バージョンに
+戻せなくなる場合があるため、退避できない状態で進めるのは危険と判断している。
+
+インスタンス自体は落とさないので、接続先アドレスは変わらない。
+「サーバー停止中に更新」はできない（停止 = インスタンスごと終了しており、
+steamcmd を走らせる機械が無い）。
+
+結果は標準出力の `UPDATE_RESULT: <種別> ...` という行で Lambda へ返す。
+Lambda は VPC 外にいて EC2 と直接通信できないため、SSM の実行結果を経由する。
 
 ### pal-graceful-stop.sh ─ 停止時（guardian / idle-watcher から）
 
@@ -202,17 +259,30 @@ Lambda から送る経路（EventBridge → Lambda）も併用している。無
 
 ```bash
 # ログを見る（SSM Session Manager でインスタンスに入ってから）
-sudo journalctl -u palworld -f          # ゲームサーバー本体
-sudo journalctl -u pal-guardian -f      # 中断監視
-sudo journalctl -u pal-backup -n 50     # 直近のバックアップ結果
-sudo journalctl -u pal-idle -f          # 無人検知
+sudo tail -50 /var/log/pal-bootstrap.log   # 起動処理（install.sh）
+sudo journalctl -u palworld -f             # ゲームサーバー本体
+sudo journalctl -u pal-guardian -f         # 中断監視
+sudo journalctl -u pal-backup -n 50        # 直近のバックアップ結果
+sudo journalctl -u pal-idle -f             # 無人検知
+sudo journalctl -u pal-post-boot           # キャッシュ作成・更新チェック
+
+# 現在のバージョンと、S3 キャッシュのバージョン
+sudo grep buildid /home/palworld/palserver/steamapps/appmanifest_2394010.acf
+aws s3 cp s3://<バケット>/gamecache/buildid.txt - ; echo
 
 # タイマーの次回実行時刻
 systemctl list-timers 'pal-*'
 
-# 手動でバックアップを走らせる（/pal backup と同じ）
-sudo /opt/palworld/bin/pal-backup.sh
+# 手動で走らせる
+sudo /opt/palworld/bin/pal-backup.sh       # /pal backup と同じ
+sudo /opt/palworld/bin/pal-update.sh       # /pal update と同じ
+sudo /opt/palworld/bin/pal-post-boot.sh    # キャッシュ作成をやり直す
 ```
+
+**「更新したのに反映されない」ときは、この 2 つのバージョンを比べる。**
+手元が新しく S3 キャッシュが古いままなら、キャッシュの作成に失敗している
+（`journalctl -u pal-post-boot` に理由が出る）。この状態を放置すると、
+起動のたびに古い版が展開されることになる。
 
 スクリプトを修正したときは `terraform apply` で S3 が更新され、
 **次回起動から**反映される。動いているサーバーに即時反映したい場合は
