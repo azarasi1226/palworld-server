@@ -71,13 +71,46 @@ log "dns: $PAL_FQDN -> $IP"
 # ---------------------------------------------------------------------------
 mkdir -p "$PAL_DIR"
 
-if $AWS s3 cp "$S3/gamecache/palserver.tar.zst" - 2>/dev/null | zstd -d -q | tar -xf - -C "$PAL_DIR"; then
+# --- 展開する前にキャッシュが使えるか決める ---------------------------------
+# Palworld は「セーブより古いゲーム」では起動できない。
+#   Save data version mismatch. This data was created with a newer version.
+# → LowLevelFatalError で即クラッシュし、systemd が再起動を繰り返すだけになる。
+#
+# この状況は /pal update の直後にキャッシュ更新が失敗した (または更新中に
+# 回収された) 場合に起こる。展開してから気づくとセーブを退避・復元しながら
+# 入れ替える必要が出るため、展開前に判定して使わない判断だけを下す。
+# 判定の結果はクリーンインストール (= キャッシュが無いときと同じ経路) に合流する。
+SAVE_BUILD=$($AWS s3api head-object --bucket "$PAL_BUCKET" --key "saves/latest.tar.zst" \
+  --query 'Metadata."game-buildid"' --output text 2>/dev/null || echo 0)
+CACHE_BUILD=$($AWS s3 cp "$S3/gamecache/buildid.txt" - 2>/dev/null || echo 0)
+# メタデータ無し ("None") や取得失敗は 0 に寄せる。set -e 下で数値比較を
+# 安全に行うため、ここで必ず数値にしておく。
+case "$SAVE_BUILD" in '' | *[!0-9]*) SAVE_BUILD=0 ;; esac
+case "$CACHE_BUILD" in '' | *[!0-9]*) CACHE_BUILD=0 ;; esac
+
+# セーブの世代が分かっていて、キャッシュがそれより古い (or 不明) なら使わない。
+# 不明 (0) も使わない側に倒す。余計にクリーンインストールするだけで済み、
+# 逆に古いキャッシュを使うとクラッシュループになるため。
+CACHE_USABLE=1
+if [ "$SAVE_BUILD" -gt 0 ] && [ "$SAVE_BUILD" -gt "$CACHE_BUILD" ]; then
+  log "cache is not new enough for the save (cache=$CACHE_BUILD save=$SAVE_BUILD); ignoring it"
+  CACHE_USABLE=0
+fi
+
+if [ "$CACHE_USABLE" = "1" ] \
+  && $AWS s3 cp "$S3/gamecache/palserver.tar.zst" - 2>/dev/null | zstd -d -q | tar -xf - -C "$PAL_DIR"; then
   log "game restored from S3 cache (buildid=$(buildid_local))"
 else
-  # キャッシュが無い / 壊れている場合だけ steamcmd で取得する。
+  # キャッシュが無い / 壊れている / セーブに対して古い場合は steamcmd で取得する。
   rm -rf "${PAL_DIR:?}"/* # 途中まで展開された残骸を消す
-  log "no usable game cache; installing via steamcmd"
-  notify "🔧 ゲーム本体を取得しています" "初回セットアップのためダウンロードしています (3〜5 分かかります)。" blue
+  if [ "$CACHE_USABLE" = "0" ]; then
+    log "installing via steamcmd (cache too old for the save)"
+    notify "⬆️ ゲーム本体を更新します" \
+      "セーブが新しいバージョンで作られているため、最新版を取得してから起動します（3〜5 分）。" yellow
+  else
+    log "no usable game cache; installing via steamcmd"
+    notify "🔧 ゲーム本体を取得しています" "初回セットアップのためダウンロードしています (3〜5 分かかります)。" blue
+  fi
 
   chown -R palworld:palworld "$PAL_HOME"
   run_steamcmd || log "steamcmd returned non-zero; verifying actual state"
@@ -94,6 +127,18 @@ fi
 if [ ! -x "$PAL_DIR/PalServer.sh" ]; then
   log "FATAL: PalServer.sh is missing after restoring the cache"
   notify "🚨 ゲーム本体が壊れています" "S3 のキャッシュが不完全な可能性があります。\ngamecache/ を削除してから /pal start でやり直してください。" red
+  exit 1
+fi
+
+# 用意できたゲームが本当にセーブより新しいか、実体 (appmanifest) で最終確認する。
+# 上の判定は buildid.txt という「申告」を見ているだけなので、ここで突き合わせる。
+# 通常は成立しないが、成立した場合はクラッシュループにさせず理由を伝えて止める。
+GAME_BUILD=$(buildid_local)
+case "$GAME_BUILD" in '' | *[!0-9]*) GAME_BUILD=0 ;; esac
+if [ "$SAVE_BUILD" -gt 0 ] && [ "$GAME_BUILD" -gt 0 ] && [ "$SAVE_BUILD" -gt "$GAME_BUILD" ]; then
+  log "FATAL: game is older than the save (save=$SAVE_BUILD game=$GAME_BUILD)"
+  notify "🚨 起動できません" \
+    "セーブ (build $SAVE_BUILD) より新しいゲーム本体を取得できませんでした。\nSteam 側の障害の可能性があります。時間をおいて /pal start でやり直してください。" red
   exit 1
 fi
 
@@ -131,51 +176,6 @@ fi
 # 4. セーブ復元 (排他ロック待ち + 検証 + フォールバックは pal-restore.sh 内)
 # ---------------------------------------------------------------------------
 /opt/palworld/bin/pal-restore.sh
-
-# --- セーブがゲームより新しい場合は更新を必須にする -------------------------
-# Palworld は「セーブより古いゲーム」では起動できない
-#   Save data version mismatch. This data was created with a newer version.
-# → LowLevelFatalError で即クラッシュし、systemd が再起動を繰り返すだけになる。
-#
-# 起動処理では原則として更新しない方針だが、これは選択の余地がない。
-# 更新しなければサーバーが起動できないため、例外として実行する。
-# (キャッシュが古いまま新しいセーブを復元すると、この状況に必ず陥る)
-SAVE_BUILD=$($AWS s3api head-object --bucket "$PAL_BUCKET" --key "saves/latest.tar.zst" \
-  --query 'Metadata."game-buildid"' --output text 2>/dev/null || echo "None")
-GAME_BUILD=$(buildid_local)
-
-if [ "$SAVE_BUILD" != "None" ] && [ -n "$SAVE_BUILD" ] && [ "$SAVE_BUILD" != "0" ] \
-  && [ "$GAME_BUILD" != "0" ] && [ "$SAVE_BUILD" -gt "$GAME_BUILD" ] 2>/dev/null; then
-  log "save requires a newer game (save=$SAVE_BUILD game=$GAME_BUILD); updating"
-  notify "⬆️ ゲーム本体の更新が必要です" \
-    "セーブが新しいバージョンで作られているため、このままでは起動できません。\n更新してから起動します（3〜5 分）。" yellow
-
-  # キャッシュから復元した状態に差分更新は効かない (pal-update.sh のコメント参照)。
-  # ゲーム本体だけを消してクリーンインストールする。
-  # Pal/Saved は復元済みなので必ず退避すること。
-  SAVED_HOLD="$WORK_DIR/saved-hold"
-  rm -rf "$SAVED_HOLD"
-  [ -d "$PAL_DIR/Pal/Saved" ] && mv "$PAL_DIR/Pal/Saved" "$SAVED_HOLD"
-  rm -rf "${PAL_DIR:?}"/*
-  chown -R palworld:palworld "$PAL_HOME"
-
-  run_steamcmd || log "steamcmd returned non-zero; verifying actual state"
-
-  if [ -d "$SAVED_HOLD" ]; then
-    mkdir -p "$PAL_DIR/Pal"
-    mv "$SAVED_HOLD" "$PAL_DIR/Pal/Saved"
-    chown -R palworld:palworld "$PAL_DIR/Pal/Saved"
-  fi
-  GAME_BUILD=$(buildid_local)
-
-  if [ "$GAME_BUILD" = "0" ] || [ "$SAVE_BUILD" -gt "$GAME_BUILD" ] 2>/dev/null; then
-    log "FATAL: game is still older than the save (save=$SAVE_BUILD game=$GAME_BUILD)"
-    notify "🚨 起動できません" \
-      "セーブ (build $SAVE_BUILD) より新しいゲーム本体を取得できませんでした。\nSteam 側の障害の可能性があります。時間をおいて /pal start でやり直してください。" red
-    exit 1
-  fi
-  log "updated to build $GAME_BUILD; save is now compatible"
-fi
 
 # 以後この個体が正。ロックを取得し、途中で死んだら後任が 90 秒で引き継ぐ。
 lock_write
