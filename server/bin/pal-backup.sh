@@ -97,7 +97,7 @@ zstd -d -q --stdout "$WORK_DIR/backup.tar.zst" | tar -tf - >/dev/null \
 # 5. 原子的 PUT (単一オブジェクト上書き。旧世代はバージョニングが保持)
 # ---------------------------------------------------------------------------
 $AWS s3 cp "$WORK_DIR/backup.tar.zst" "$S3/saves/latest.tar.zst" \
-  --metadata "level-sav-size=$SIZE" --no-progress >/dev/null
+  --metadata "level-sav-size=$SIZE,game-buildid=$(buildid_local)" --no-progress >/dev/null
 
 date -u +%s > "$STATE_DIR/last-backup-epoch"
 log "backup ok: Level.sav=${SIZE}B archive=$(stat -c %s "$WORK_DIR/backup.tar.zst")B"

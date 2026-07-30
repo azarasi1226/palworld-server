@@ -78,13 +78,53 @@ fi
 log "stopping palworld.service"
 systemctl stop palworld.service 2>/dev/null || true
 
+# ゲーム本体を消してからクリーンインストールする。
+#
+# S3 キャッシュから復元した状態に対して steamcmd の差分更新は成立しない。
+#   Update state (0x0) : Timed out waiting for update to start, bailing.
+#   Error! App '2394010' state is 0x6 after update job.
+# 復元でファイルの状態が steamcmd の想定と噛み合わなくなるためで、
+# リトライしても必ず同じ結果になる (実際に何度も踏んだ)。
+# 「差分を試してから諦める」と 4 分無駄になるので、最初からクリーンにする。
+#
+# ★ Pal/Saved を退避してから消すこと。ここにはワールドだけでなく
+#   GameUserSettings.ini (DedicatedServerName = どのワールドを開くか) も入っており、
+#   消すとサーバーが新規ワールドを作ってしまう (キャラクリやり直しになる)。
+SAVED_HOLD="$WORK_DIR/saved-hold"
+rm -rf "$SAVED_HOLD"
+if [ -d "$PAL_DIR/Pal/Saved" ]; then
+  mv "$PAL_DIR/Pal/Saved" "$SAVED_HOLD"
+  log "held Pal/Saved aside ($(du -sh "$SAVED_HOLD" 2>/dev/null | cut -f1))"
+fi
+
+rm -rf "${PAL_DIR:?}"/*
+rm -rf /home/palworld/.local/share/Steam/steamapps/downloading \
+       /home/palworld/.local/share/Steam/steamapps/temp
+chown -R palworld:palworld "$PAL_HOME"
+
 run_steamcmd || log "steamcmd returned non-zero; verifying actual state"
+
+# セーブを戻す。ここで失敗すると新規ワールドで起動してしまうため、
+# 復元できなければ起動させずに中止する (S3 には退避済みなので復旧可能)。
+if [ -d "$SAVED_HOLD" ]; then
+  mkdir -p "$PAL_DIR/Pal"
+  if mv "$SAVED_HOLD" "$PAL_DIR/Pal/Saved"; then
+    chown -R palworld:palworld "$PAL_DIR/Pal/Saved"
+    log "restored Pal/Saved"
+  else
+    log "FATAL: could not restore Pal/Saved"
+    notify "🚨 更新後のセーブ復元に失敗しました" \
+      "サーバーは起動しません。セーブは S3 (saves/latest.tar.zst) に保全されています。\n/pal restart で S3 から復元してください。" red
+    echo "UPDATE_RESULT: failed"
+    exit 1
+  fi
+fi
 
 NEW=$(buildid_local)
 if [ ! -x "$PAL_DIR/PalServer.sh" ] || [ "$NEW" = "0" ]; then
   log "FATAL: game files are broken after update (buildid=$NEW)"
   notify "🚨 更新に失敗しました" \
-    "ゲームファイルが壊れています。/pal restart でクリーンインストールを試してください。\nセーブは更新前の状態で S3 に保全されています。" red
+    "ゲーム本体を取得できませんでした。Steam 側の障害の可能性があります。\nセーブは S3 に保全されています。時間をおいて /pal restart を試してください。" red
   echo "UPDATE_RESULT: failed"
   exit 1
 fi

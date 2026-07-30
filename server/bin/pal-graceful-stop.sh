@@ -88,29 +88,11 @@ touch "$STATE_DIR/stopped"
 # --- ロック解放 (必ずセーブのアップロード後) --------------------------------
 lock_release
 
-# --- ASG への後始末 ---------------------------------------------------------
-IID=$(instance_id)
-# --query で 2 値まとめて取り出す (python プロセスを挟まない。緊急停止は 2 分制限)
-read -r ASG_NAME LC_STATE <<< "$($AWS autoscaling describe-auto-scaling-instances \
-  --instance-ids "$IID" \
-  --query "AutoScalingInstances[0].[AutoScalingGroupName,LifecycleState]" \
-  --output text 2>/dev/null || echo "")"
-
-if [ "$LC_STATE" = "Terminating:Wait" ]; then
-  # ライフサイクルフックを解放して終了を進めさせる。
-  $AWS autoscaling complete-lifecycle-action \
-    --auto-scaling-group-name "$ASG_NAME" \
-    --lifecycle-hook-name "$PAL_PROJECT-save-before-terminate" \
-    --instance-id "$IID" \
-    --lifecycle-action-result CONTINUE 2>/dev/null || true
-elif [ "$REASON" = "idle" ] || [ "$REASON" = "manual" ]; then
-  # 自発停止: desired を 0 にして自分を終了させる。この後 Terminating:Wait が来るが、
-  # stopped フラグを見た guardian が再セーブせずフック解放だけを行う。
-  [ -n "$ASG_NAME" ] && $AWS autoscaling set-desired-capacity \
-    --auto-scaling-group-name "$ASG_NAME" --desired-capacity 0 2>/dev/null || true
-fi
-
 # --- 結果通知 (ロスト見込みの明示) ------------------------------------------
+# ★ ASG への後始末より先に送ること。
+#   ライフサイクルフックを解放すると AWS はその場でインスタンスを削除するため、
+#   後に回すと通知を送り切る前に電源が切れる (実際にスポット回収時だけ
+#   「緊急セーブ完了」が届かない現象になっていた。セーブ自体は成功していた)。
 ELAPSED=$(( $(date +%s) - START_EPOCH ))
 if [ "$BACKUP_OK" = "1" ]; then
   case "$CAUSE" in
@@ -131,3 +113,25 @@ else
 fi
 
 log "graceful stop done (reason=$REASON, backup_ok=$BACKUP_OK, ${ELAPSED}s)"
+
+# --- ASG への後始末 (ここから先はいつ電源が切れてもよい) ---------------------
+IID=$(instance_id)
+# --query で 2 値まとめて取り出す (python プロセスを挟まない。緊急停止は 2 分制限)
+read -r ASG_NAME LC_STATE <<< "$($AWS autoscaling describe-auto-scaling-instances \
+  --instance-ids "$IID" \
+  --query "AutoScalingInstances[0].[AutoScalingGroupName,LifecycleState]" \
+  --output text 2>/dev/null || echo "")"
+
+if [ "$LC_STATE" = "Terminating:Wait" ]; then
+  # ライフサイクルフックを解放して終了を進めさせる。
+  $AWS autoscaling complete-lifecycle-action \
+    --auto-scaling-group-name "$ASG_NAME" \
+    --lifecycle-hook-name "$PAL_PROJECT-save-before-terminate" \
+    --instance-id "$IID" \
+    --lifecycle-action-result CONTINUE 2>/dev/null || true
+elif [ "$REASON" = "idle" ] || [ "$REASON" = "manual" ]; then
+  # 自発停止: desired を 0 にして自分を終了させる。この後 Terminating:Wait が来るが、
+  # stopped フラグを見た guardian が再セーブせずフック解放だけを行う。
+  [ -n "$ASG_NAME" ] && $AWS autoscaling set-desired-capacity \
+    --auto-scaling-group-name "$ASG_NAME" --desired-capacity 0 2>/dev/null || true
+fi

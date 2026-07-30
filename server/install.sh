@@ -115,6 +115,51 @@ fi
 # ---------------------------------------------------------------------------
 /opt/palworld/bin/pal-restore.sh
 
+# --- セーブがゲームより新しい場合は更新を必須にする -------------------------
+# Palworld は「セーブより古いゲーム」では起動できない
+#   Save data version mismatch. This data was created with a newer version.
+# → LowLevelFatalError で即クラッシュし、systemd が再起動を繰り返すだけになる。
+#
+# 起動処理では原則として更新しない方針だが、これは選択の余地がない。
+# 更新しなければサーバーが起動できないため、例外として実行する。
+# (キャッシュが古いまま新しいセーブを復元すると、この状況に必ず陥る)
+SAVE_BUILD=$($AWS s3api head-object --bucket "$PAL_BUCKET" --key "saves/latest.tar.zst" \
+  --query 'Metadata."game-buildid"' --output text 2>/dev/null || echo "None")
+GAME_BUILD=$(buildid_local)
+
+if [ "$SAVE_BUILD" != "None" ] && [ -n "$SAVE_BUILD" ] && [ "$SAVE_BUILD" != "0" ] \
+  && [ "$GAME_BUILD" != "0" ] && [ "$SAVE_BUILD" -gt "$GAME_BUILD" ] 2>/dev/null; then
+  log "save requires a newer game (save=$SAVE_BUILD game=$GAME_BUILD); updating"
+  notify "⬆️ ゲーム本体の更新が必要です" \
+    "セーブが新しいバージョンで作られているため、このままでは起動できません。\n更新してから起動します（3〜5 分）。" yellow
+
+  # キャッシュから復元した状態に差分更新は効かない (pal-update.sh のコメント参照)。
+  # ゲーム本体だけを消してクリーンインストールする。
+  # Pal/Saved は復元済みなので必ず退避すること。
+  SAVED_HOLD="$WORK_DIR/saved-hold"
+  rm -rf "$SAVED_HOLD"
+  [ -d "$PAL_DIR/Pal/Saved" ] && mv "$PAL_DIR/Pal/Saved" "$SAVED_HOLD"
+  rm -rf "${PAL_DIR:?}"/*
+  chown -R palworld:palworld "$PAL_HOME"
+
+  run_steamcmd || log "steamcmd returned non-zero; verifying actual state"
+
+  if [ -d "$SAVED_HOLD" ]; then
+    mkdir -p "$PAL_DIR/Pal"
+    mv "$SAVED_HOLD" "$PAL_DIR/Pal/Saved"
+    chown -R palworld:palworld "$PAL_DIR/Pal/Saved"
+  fi
+  GAME_BUILD=$(buildid_local)
+
+  if [ "$GAME_BUILD" = "0" ] || [ "$SAVE_BUILD" -gt "$GAME_BUILD" ] 2>/dev/null; then
+    log "FATAL: game is still older than the save (save=$SAVE_BUILD game=$GAME_BUILD)"
+    notify "🚨 起動できません" \
+      "セーブ (build $SAVE_BUILD) より新しいゲーム本体を取得できませんでした。\nSteam 側の障害の可能性があります。時間をおいて /pal start でやり直してください。" red
+    exit 1
+  fi
+  log "updated to build $GAME_BUILD; save is now compatible"
+fi
+
 # 以後この個体が正。ロックを取得し、途中で死んだら後任が 90 秒で引き継ぐ。
 lock_write
 
