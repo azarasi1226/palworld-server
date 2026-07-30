@@ -1,7 +1,7 @@
 // Discord Bot 本体。3 つの顔を持つ:
-//   1. Function URL: Discord からのインタラクション受信 (署名検証 → deferred 応答)
+//   1. インタラクション受信: API Gateway 経由 (署名検証 → deferred 応答)
 //   2. ワーカー: 自分自身への非同期 invoke で重い処理を実行し、応答を差し替える
-//   3. EventBridge: スポット中断 / 起動失敗イベントの通知 (B 系統)
+//   3. EventBridge: ASG 起動失敗イベントの通知 (B 系統)
 //
 // 依存ゼロ: 署名検証は node:crypto、AWS は Lambda ランタイム同梱の SDK v3。
 import crypto from "node:crypto";
@@ -56,7 +56,7 @@ export const handler = async (event) => {
 };
 
 // ---------------------------------------------------------------------------
-// 1. Function URL: 署名検証と即時応答 (3 秒制限)
+// 1. インタラクション受信: 署名検証と即時応答 (3 秒制限)
 // ---------------------------------------------------------------------------
 
 async function handleFunctionUrl(event) {

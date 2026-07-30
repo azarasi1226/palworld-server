@@ -60,7 +60,7 @@ flowchart TB
             archive["saves/archive/&lt;ts&gt;.tar.zst<br>1 時間ごとの世代 (30 日保持)"]
             quarantine["saves/quarantine/<br>整合性チェック落ちを隔離"]
             lock["lock/active.json<br>排他ロック (世代逆転の防止)"]
-            cache["gamecache/palserver.tar.zst<br>本体キャッシュ (起動 5 分 → 90 秒)"]
+            cache["gamecache/palserver.tar.zst<br>本体キャッシュ (起動 5 分 → 45 秒)"]
             statusj["status.json / logs/"]
         end
     end
