@@ -28,6 +28,7 @@ const {
   DISCORD_APP_ID,
   DISCORD_PUBLIC_KEY,
   DISCORD_ROLE_ID,
+  PROJECT_NAME,
   ASG_NAME,
   BUCKET,
   WEBHOOK_PARAM,
@@ -436,9 +437,17 @@ function summarizeUpdate(stdout) {
 // コストレポート
 //   [A] 今月の実績 (Cost Explorer) ... 正確だが反映が半日〜1日遅れる
 //   [B] 今この瞬間 (EC2 API)       ... 遅延なし。時間単価と当セッション分
+//
+// [A] は Project タグでこのプロジェクトぶんだけに絞り込んでいる。そのため
+// 請求コンソールで Project をコスト配分タグとして有効化しておく必要がある
+// (未有効だと全額がタグ無し扱いになり 0 円に見える)。README のトラブル
+// シュート参照。
 // ---------------------------------------------------------------------------
 
-const COST_CACHE_KEY = "cost-cache.json";
+// キーに v2 が付いているのは、Project タグでの絞り込みを入れる前に書かれた
+// 「アカウント全体の合算値」を掴んだままにしないため (TTL 1 時間ぶん古い値が
+// 出続けるのを避ける)。旧 cost-cache.json は参照されなくなる。
+const COST_CACHE_KEY = "cost-cache-v2.json";
 const COST_CACHE_TTL = 3600; // 秒
 
 // スポット価格以外の固定費。EC2 API では取れないため実際の構成に合わせて持つ。
@@ -485,6 +494,7 @@ async function doCost() {
   // 実装の都合（Cost Explorer 由来など）は書かない。利用者に伝わらないうえ、
   // 知っても行動が変わらないため。「反映が遅れる」ことだけ伝われば十分。
   out.push("_※ 今月の実績は反映が半日〜1 日遅れます_");
+  out.push("_※ 今月の実績はこのサーバーぶんのみ（他プロジェクトを含みません）_");
   out.push(
     fx.exact
       ? `_※ 参考為替: $1 = ¥${fx.rate.toFixed(1)}_`
@@ -542,6 +552,16 @@ async function costThisMonth(fx) {
   lines.push("  ─────────────────");
   lines.push(`  合計: ${yen(total, fx.rate)}  ($${total.toFixed(2)})`);
   lines.push("```");
+
+  // 絞り込みが効いている以上、0 円は「まだ何も動かしていない」だけでなく
+  // 「Project タグがコスト配分タグとして未有効」でも起きる。後者は気付きに
+  // くいので、0 円のときだけ理由を添える。
+  if (total < 0.005) {
+    lines.push(
+      "_（0 円のままなら、請求コンソールで Project をコスト配分タグとして有効化してください。有効化は遡及しないため、反映は翌日以降です）_",
+    );
+  }
+
   return lines;
 }
 
@@ -621,6 +641,12 @@ async function fetchCostExplorer() {
         Granularity: "MONTHLY",
         Metrics: ["UnblendedCost"],
         GroupBy: [{ Type: "DIMENSION", Key: "SERVICE" }],
+        // GroupBy は分類するだけで絞り込まない。これが無いと同じ AWS
+        // アカウントで動く別プロジェクト (別ゲームのサーバーなど) の
+        // 課金まで合算されてしまう。
+        Filter: {
+          Tags: { Key: "Project", Values: [PROJECT_NAME], MatchOptions: ["EQUALS"] },
+        },
       }),
     );
 

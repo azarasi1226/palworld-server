@@ -40,6 +40,11 @@ resource "aws_lambda_function" "discord" {
       GAME_PORT            = tostring(var.game_port)
       SELF_FUNCTION_NAME   = "${local.name}-discord"
       STATUS_STALE_SECONDS = "90"
+
+      # /pz cost の今月の実績を、このプロジェクトぶんだけに絞り込むために使う。
+      # versions.tf の default_tags が付ける Project タグの値と一致していないと
+      # 絞り込みが空振りして 0 円になる。
+      PROJECT_NAME = var.project_name
     }
   }
 }

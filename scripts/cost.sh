@@ -7,6 +7,10 @@
 #   [A] 実績 (Cost Explorer) ... 正確だが反映が半日〜1日遅れる
 #   [B] このセッション (EC2 API) ... 遅延ゼロ。今の起動でここまでいくら使ったか
 #
+# [A] は Project タグでこのプロジェクトぶんだけに絞り込む。そのため請求
+# コンソールで Project をコスト配分タグとして有効化しておく必要がある
+# (未有効だと全額がタグ無し扱いになり 0 円に見える)。有効化は遡及しない。
+#
 # 注意: Cost Explorer API は 1 リクエスト $0.01 の有料 API。
 # 1 回の実行につき 1 コールに抑えてある (DAILY 取得から合計・内訳・推移を計算)。
 set -euo pipefail
@@ -32,15 +36,18 @@ echo "==================================================================="
 echo " Palworld サーバー コストレポート  ($(date '+%Y-%m-%d %H:%M'))"
 echo "==================================================================="
 echo
-echo "[A] 今月の実績  ($MONTH_START 〜)"
+echo "[A] 今月の実績  ($MONTH_START 〜 / Project=$PROJECT のみ)"
 echo "-------------------------------------------------------------------"
 
 # Cost Explorer は us-east-1 のグローバルエンドポイント。
+# --group-by は分類するだけで絞り込まない。--filter が無いと同じ AWS アカウント
+# で動く別プロジェクトの課金まで合算されるため、Project タグで絞り込む。
 if ! CE_JSON=$(aws ce get-cost-and-usage \
   --time-period "Start=$MONTH_START,End=$TOMORROW" \
   --granularity DAILY \
   --metrics UnblendedCost \
   --group-by Type=DIMENSION,Key=SERVICE \
+  --filter "{\"Tags\":{\"Key\":\"Project\",\"Values\":[\"$PROJECT\"],\"MatchOptions\":[\"EQUALS\"]}}" \
   --region us-east-1 --output json 2>&1); then
   echo "  取得できませんでした:"
   echo "$CE_JSON" | head -3 | sed 's/^/    /'
@@ -49,11 +56,13 @@ if ! CE_JSON=$(aws ce get-cost-and-usage \
 fi
 
 if [ -n "$CE_JSON" ]; then
-  echo "$CE_JSON" | python -c '
-import json, sys, unicodedata
+  # コードはヒアドキュメントで渡す。python -c '...' だと中のシングルクォートを
+  # シェルが剥がしてしまい、f-string が壊れて SyntaxError になる。
+  # JSON は環境変数で渡す (stdin はヒアドキュメントが使うため)。
+  CE_JSON="$CE_JSON" python - <<'PYCODE'
+import json, os, unicodedata
 from collections import defaultdict
 
-import os
 FX = float(os.environ["FX"])
 
 def pad(s, width):
@@ -64,7 +73,7 @@ def pad(s, width):
 def yen(usd):
     return f"¥{round(usd * FX):,}"
 
-data = json.load(sys.stdin)
+data = json.loads(os.environ["CE_JSON"])
 by_service, by_day = defaultdict(float), []
 
 for period in data["ResultsByTime"]:
@@ -87,6 +96,14 @@ for name, amt in sorted(by_service.items(), key=lambda x: -x[1]):
 print(f"    {'-' * 30} {'-' * 9}")
 print(f"    {pad('合計', 30)} {yen(total):>9}   (${total:.2f})")
 
+# 絞り込みが効いている以上、0 円は「まだ何も動かしていない」だけでなく
+# 「Project タグがコスト配分タグとして未有効」でも起きる。後者は気付き
+# にくいので、0 円のときだけ理由を添える。
+if total < 0.005:
+    print()
+    print("    0 円のままなら、請求コンソールで Project をコスト配分タグとして")
+    print("    有効化してください (有効化は遡及しないため反映は翌日以降です)。")
+
 recent = [d for d in by_day if d[1] >= 0.005][-7:]
 if recent:
     print()
@@ -94,7 +111,7 @@ if recent:
     peak = max(d[1] for d in recent) or 1
     for day, amt in recent:
         print(f"    {day}  {yen(amt):>7}  {'#' * max(1, int(amt / peak * 24))}")
-'
+PYCODE
 fi
 
 echo
@@ -119,7 +136,7 @@ else
 
   echo "  🎮 稼働中: $ITYPE ($AZ)"
   UP_SEC=$(( $(date -u +%s) - $(date -u -d "$LAUNCH" +%s) ))
-  SPOT="$SPOT" UP_SEC="$UP_SEC" python -c '
+  SPOT="$SPOT" UP_SEC="$UP_SEC" python - <<'PYCODE'
 import os
 spot = float(os.environ["SPOT"] or 0)
 up_h = int(os.environ["UP_SEC"]) / 3600
@@ -144,12 +161,13 @@ print(f"    {'-' * 30} {'-' * 9}")
 # 合計は時間単価ではなく「この起動で実際にいくら使ったか」。
 # 単価は上の内訳で示しているので、ここで繰り返すとノイズになる。
 print(f"    {pad('合計', 30)} {yen(rate * up_h):>9}")
-'
+PYCODE
 fi
 
 # 注記はまとめて末尾に置く (本文の途中に挟むと読みが途切れるため)
 echo
 echo "-------------------------------------------------------------------"
 echo "※ [A] は反映が半日〜1 日遅れます（[B] は遅延なし）"
+echo "※ [A] は Project=$PROJECT タグの付いたリソースのみ（他プロジェクトは含みません）"
 echo "※ この実行で Cost Explorer API を 1 回使用 (\$0.01)"
 echo "※ 参考為替: \$1 = ¥${FX}${FX_NOTE}"
